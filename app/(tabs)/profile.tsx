@@ -1,24 +1,76 @@
-import React, { useState } from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, Image, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import {supabase} from '@/lib/supabase'
+import Post from '@/components/Post' 
+import Avatar from "@/components/Avatar";
+
 
 export default function ProfileScreen() {
   const [selectedTab, setSelectedTab] = useState("Demos");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
 
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  async function fetchProfile() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("username, avatar_url")
+        .eq("id", user.id)
+        .single();
+
+      if (error) throw error;
+      setUsername(data.username);
+      setAvatarUrl(data.avatar_url);
+    } catch (error) {
+      if (error instanceof Error) Alert.alert("Error fetching profile", error.message);
+    }
+  }
+  
   return (
     <View style={styles.container}>
-      {/* Header (zonder settings icoon) */}
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.profileText}>Profile</Text>
       </View>
 
-      {/* Profielfoto */}
-      <TouchableOpacity style={styles.profileImageContainer}>
-        <Image source={{ uri: "https://via.placeholder.com/100" }} style={styles.profileImage} />
-        <Text style={styles.addIcon}>+</Text>
-      </TouchableOpacity>
+      {/* Profile Image */}
+      <View>
+      <Avatar
+      size={200}
+      url={avatarUrl}
+      onUpload={async (filePath) => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
 
-      {/* Gebruikersinformatie */}
-      <Text style={styles.username}>original kankermongool Skip</Text>
+          // Update the profile in Supabase
+          const { error } = await supabase
+            .from('profiles')
+            .update({ avatar_url: filePath })
+            .eq('id', user.id);
+
+          if (error) throw error;
+
+          // Refresh the profile data
+          fetchProfile();
+        } catch (error) {
+          if (error instanceof Error) Alert.alert("Error updating avatar", error.message);
+        }
+      }}
+    />
+
+      </View>
+
+      {/* User Info */}
+      <Text style={styles.username}>{username ?? "Loading..."}</Text>
       <Text style={styles.role}>Producer</Text>
       <Text style={styles.location}>Producer from the Netherlands</Text>
 
@@ -26,28 +78,33 @@ export default function ProfileScreen() {
       <View style={styles.tabs}>
         {["Demos", "Releases", "Contact"].map((tab) => (
           <TouchableOpacity key={tab} onPress={() => setSelectedTab(tab)}>
-            <Text style={[styles.tabText, selectedTab === tab && styles.activeTab]}>{tab}</Text>
+            <Text style={[styles.tabText, selectedTab === tab && styles.activeTab]}>
+              {tab}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* Grid met Demo’s / Releases */}
-      <View style={styles.grid}>
-        {Array(6).fill(null).map((_, index) => (
-          <View key={index} style={styles.gridItem} />
-        ))}
+      {/* Content Area */}
+      <View style={styles.contentContainer}>
+        {selectedTab === "Demos" ? (
+          <Post content="This is a sample post!" userId='123' />
+        ) : selectedTab === "Releases" ? (
+          <Text style={styles.placeholderText}>No releases available</Text>
+        ) : selectedTab === "Contact" ? (
+          <Text style={styles.placeholderText}>Contact details here</Text>
+        ) : null}
       </View>
     </View>
   );
 }
 
-// STIJLEN
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#121212",
     alignItems: "center",
-    paddingTop: 50
+    paddingTop: 50,
   },
   header: {
     width: "90%",
@@ -57,7 +114,7 @@ const styles = StyleSheet.create({
   profileText: {
     color: "white",
     fontSize: 20,
-    fontWeight: "bold"
+    fontWeight: "bold",
   },
   profileImageContainer: {
     width: 100,
@@ -67,59 +124,55 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     position: "relative",
-    marginBottom: 10
+    marginBottom: 10,
   },
   profileImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 45
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   addIcon: {
     position: "absolute",
     fontSize: 24,
     color: "white",
-    bottom: 5
+    bottom: 5,
+  },
+  placeholderText: {
+    color: "gray",
+    fontSize: 14,
   },
   username: {
     color: "white",
     fontSize: 22,
-    fontWeight: "bold"
+    fontWeight: "bold",
   },
   role: {
     color: "gray",
-    fontSize: 16
+    fontSize: 16,
   },
   location: {
     color: "gray",
     fontSize: 14,
-    marginBottom: 20
+    marginBottom: 20,
   },
   tabs: {
     flexDirection: "row",
     width: "80%",
     justifyContent: "space-around",
-    marginBottom: 20
+    marginBottom: 20,
   },
   tabText: {
     color: "gray",
-    fontSize: 16
+    fontSize: 16,
   },
   activeTab: {
     color: "#A020F0",
     fontWeight: "bold",
-    textDecorationLine: "underline"
+    textDecorationLine: "underline",
   },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    width: "80%",
-    justifyContent: "space-between"
+  contentContainer: {
+    flex: 1,
+    width: "100%",
   },
-  gridItem: {
-    width: 80,
-    height: 80,
-    backgroundColor: "#1E1E1E",
-    borderRadius: 10,
-    marginBottom: 10
-  }
 });
+
