@@ -18,7 +18,7 @@ export default function ProfileScreen() {
       </TouchableOpacity>
 
       {/* Gebruikersinformatie */}
-      <Text style={styles.username}>original kankermongool Skip</Text>
+      <Text style={styles.username}>skipvdv</Text>
       <Text style={styles.role}>Producer</Text>
       <Text style={styles.location}>Producer from the Netherlands</Text>
 
@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#121212",
     alignItems: "center",
-    paddingTop: 50
+    paddingTop: 130
   },
   header: {
     width: "90%",
