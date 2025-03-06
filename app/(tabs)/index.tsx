@@ -44,9 +44,9 @@ const samplePosts: Post[] = [
   {
     id: "3",
     // Gebruik het lokale bestand voor de profielfoto van Dua Lipa
-    profileImage: require('../../assets/dummy_images/dua_profielfoto.png'),
+    profileImage: require('../../assets/dummy/profile/dua_profile.png'),
     username: "Dua Lipa",
-    media: require('../../assets/dummy_images/dua_1.png'),
+    media: require('../../assets/dummy/profile/dua_profile.png'),
     title: "I need a synth solo on this track",
     description: "Add a funky synth solo to this finished pop song after the last chorus.",
     tags: ["Dua Lipa style", "The Weeknd style"],

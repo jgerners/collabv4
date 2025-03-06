@@ -47,16 +47,16 @@ interface Like {
 
 // ✅ Dummy data (vervang dit later met data uit de backend)
 const dummyChats: Chat[] = [
-  { id: "1", userName: "Bruno Mars", userProfile: require('../../assets/dummy_images/tate_profiel.jpg'), lastMessage: "Let's try some extra bass!", timestamp: Date.now() - 60000, unreadCount: 1 },
-  { id: "2", userName: "Dua Lipa", userProfile: require('../../assets/dummy_images/dua_profielfoto.png'), lastMessage: "When do you think you can send over?", timestamp: Date.now() - 120000, unreadCount: 1 },
-  { id: "3", userName: "Tate Mcrae", userProfile: require('../../assets/dummy_images/skip_profiel.jpg'), lastMessage: "That sounds so fire!!! 🔥", timestamp: Date.now() - 86400000, unreadCount: 0 },
-  { id: "4", userName: "Justin Bieber", userProfile: require('../../assets/dummy_images/justin_profiel.png'), lastMessage: "Could you try to add some electric guitar?", timestamp: Date.now() - 3 * 86400000, unreadCount: 0 },
-  { id: "5", userName: "The Weeknd", userProfile: require('../../assets/dummy_images/tags/theweeknd_tag.jpg'), lastMessage: "Man, you're so dope...", timestamp: Date.now() - 5 * 86400000, unreadCount: 0 },
+  { id: "1", userName: "Bruno Mars", userProfile: require("../../assets/dummy/profile/dua_profile.png"), lastMessage: "Let's try some extra bass!", timestamp: Date.now() - 60000, unreadCount: 1 },
+  { id: "2", userName: "Dua Lipa", userProfile: require("../../assets/dummy/profile/dua_profile.png"), lastMessage: "When do you think you can send over?", timestamp: Date.now() - 120000, unreadCount: 1 },
+  { id: "3", userName: "Tate Mcrae", userProfile: require("../../assets/dummy/profile/dua_profile.png"), lastMessage: "That sounds so fire!!! 🔥", timestamp: Date.now() - 86400000, unreadCount: 0 },
+  { id: "4", userName: "Justin Bieber", userProfile: require("../../assets/dummy/profile/dua_profile.png"), lastMessage: "Could you try to add some electric guitar?", timestamp: Date.now() - 3 * 86400000, unreadCount: 0 },
+  { id: "5", userName: "The Weeknd", userProfile: require("../../assets/dummy/profile/dua_profile.png"), lastMessage: "Man, you're so dope...", timestamp: Date.now() - 5 * 86400000, unreadCount: 0 },
 ];
 
 const dummyLikes: Like[] = [
-  { id: "1", userName: "Skipvdv", userProfile: require('../../assets/dummy_images/skip_profiel.jpg'), postImage: require('../../assets/dummy_images/tate_post.mp4'), timestamp: Date.now() - 180000 },
-  { id: "2", userName: "Dua Lipa", userProfile: require('../../assets/dummy_images/dua_profielfoto.png'), postImage: require('../../assets/dummy_images/justin_singing.png'), timestamp: Date.now() - 300000 },
+  { id: "1", userName: "Skipvdv", userProfile: require("../../assets/dummy/profile/dua_profile.png"), postImage: require("../../assets/dummy/profile/dua_profile.png"), timestamp: Date.now() - 180000 },
+  { id: "2", userName: "Dua Lipa", userProfile: require("../../assets/dummy/profile/dua_profile.png"), postImage: require("../../assets/dummy/profile/dua_profile.png"), timestamp: Date.now() - 300000 },
 ];
 
 const ChatsListScreen: React.FC = () => {

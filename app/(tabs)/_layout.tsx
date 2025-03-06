@@ -6,19 +6,21 @@ import { BlurView } from 'expo-blur';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { RootStackParamList } from '../../routes'; // Zorg dat dit pad klopt
 
 // 📌 Screens Importeren
 import FeedScreen from '../(tabs)/feedtest';
 import ProfileScreen from '../(tabs)/profile';
 import ChatListScreen from '../(tabs)/chat_list';
 import ChatScreen from '../screens/chat';
+import UserProfileScreen from '../screens/userprofile';
 import UploadScreen from '../(tabs)/upload';
 
-
 // Dummy profielafbeelding
-const userProfileImage = require('../../assets/dummy_images/skip_profiel.jpg');
+const userProfileImage = require('../../assets/dummy/profile/skip_profiel.jpg');
 
-const Stack = createStackNavigator();
+// Gebruik de RootStackParamList bij het aanmaken van de Stack:
+const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
 function TabsLayout() {
@@ -50,9 +52,16 @@ function TabsLayout() {
             </TouchableOpacity>
           </View>
         ),
+        tabBarBackground: () => (
+          <BlurView
+            intensity={50}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
+        ),
         tabBarStyle: Platform.select({
-          ios: { position: 'absolute', height: 80 },
-          default: { height: 80 },
+          ios: { position: 'absolute', height: 80, backgroundColor: 'rgba(57, 57, 57, 0.81)' },
+          default: { height: 80, backgroundColor: 'rgba(57, 57, 57, 0.81)' }
         }),
       }}
     >
@@ -77,26 +86,25 @@ function TabsLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.crop.circle.fill" color={color} />,
         }}
       />
-          <Tab.Screen
+      <Tab.Screen
         name="Upload"
         component={UploadScreen}
         options={{
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
-      
     </Tab.Navigator>
   );
 }
 
-// 📌 Hoofdstructuur van de app, met Tabs en Chat als Stack (🔥 `NavigationContainer` WEGGEHAALD)
+// Hoofdstructuur van de app, met Tabs en Chat als Stack (NavigationContainer weggelaten)
 export default function AppNavigator() {
   return (
     <Stack.Navigator>
       {/* Tabs met hoofdschermen */}
       <Stack.Screen name="Main" component={TabsLayout} options={{ headerShown: false }} />
 
-      {/* Chat-scherm is GEEN tab, maar een apart scherm */}
+      {/* Chat-scherm */}
       <Stack.Screen 
         name="Chat" 
         component={ChatScreen}
@@ -110,7 +118,18 @@ export default function AppNavigator() {
           },
         }}
       />
- 
+
+      {/* User Profile scherm */}
+      <Stack.Screen 
+        name="UserProfile" 
+        component={UserProfileScreen} 
+        options={{
+          headerShown: true,
+          headerTitle: "Profile",
+          headerTintColor: "white",
+          headerStyle: { backgroundColor: "rgba(57, 57, 57, 0.95)" },
+        }}
+      />
     </Stack.Navigator>
   );
 }

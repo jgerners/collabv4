@@ -14,8 +14,8 @@ interface Request {
 
 // 📌 Dummy requests-data
 const dummyRequests: Request[] = [
-  { id: "1", userName: "Charlie Puth", userProfile: require("../assets/dummy_images/charlie_profiel.jpg"), postImage: require("../assets/dummy_images/dua_1.png") },
-  { id: "2", userName: "Ariana Grande", userProfile: require("../assets/dummy_images/ariana_profiel.png"), postImage: require("../assets/dummy_images/justin_singing.png") },
+  { id: "1", userName: "Charlie Puth", userProfile: require("../assets/dummy/profile/dua_profile.png"), postImage: require("../assets/dummy/profile/dua_profile.png") },
+  { id: "2", userName: "Ariana Grande", userProfile: require("../assets/dummy/profile/dua_profile.png"), postImage: require("../assets/dummy/profile/dua_profile.png") },
 ];
 
 const Requests: React.FC = () => {
