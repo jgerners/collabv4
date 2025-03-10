@@ -15,6 +15,11 @@ import ChatListScreen from '../(tabs)/chat_list';
 import ChatScreen from '../screens/chat';
 import UserProfileScreen from '../screens/userprofile';
 import UploadScreen from '../(tabs)/upload';
+import ArtistTagSelectScreen from "../screens/artistTagSelect";
+import GenreTagSelectScreen from "../screens/genreTagSelect";
+
+// ⬇️ AuthProvider importeren (pas pad aan naar jouw context-bestand)
+import { AuthProvider } from '../../context/authContext';
 
 // Dummy profielafbeelding
 const userProfileImage = require('../../assets/dummy/profile/skip_profiel.jpg');
@@ -53,11 +58,7 @@ function TabsLayout() {
           </View>
         ),
         tabBarBackground: () => (
-          <BlurView
-            intensity={50}
-            tint="dark"
-            style={StyleSheet.absoluteFill}
-          />
+          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
         ),
         tabBarStyle: Platform.select({
           ios: { position: 'absolute', height: 80, backgroundColor: 'rgba(57, 57, 57, 0.81)' },
@@ -97,40 +98,60 @@ function TabsLayout() {
   );
 }
 
-// Hoofdstructuur van de app, met Tabs en Chat als Stack (NavigationContainer weggelaten)
+// Hier wikkelen we de volledige navigator in de AuthProvider:
 export default function AppNavigator() {
   return (
-    <Stack.Navigator>
-      {/* Tabs met hoofdschermen */}
-      <Stack.Screen name="Main" component={TabsLayout} options={{ headerShown: false }} />
+    <AuthProvider>
+      <Stack.Navigator>
+        {/* Tabs met hoofdschermen */}
+        <Stack.Screen name="Main" component={TabsLayout} options={{ headerShown: false }} />
 
-      {/* Chat-scherm */}
-      <Stack.Screen 
-        name="Chat" 
-        component={ChatScreen}
-        options={{
-          headerShown: true,
-          headerTitle: "Chat",
-          headerBackTitle: "",
-          headerTintColor: "white",
-          headerStyle: {
-            backgroundColor: "rgba(0,0,0,0.8)",
-          },
-        }}
-      />
+        {/* Chat-scherm */}
+        <Stack.Screen 
+          name="Chat" 
+          component={ChatScreen}
+          options={{
+            headerShown: true,
+            headerTitle: "Chat",
+            headerBackTitle: "",
+            headerTintColor: "white",
+            headerStyle: {
+              backgroundColor: "rgba(0,0,0,0.8)",
+            },
+          }}
+        />
 
-      {/* User Profile scherm */}
-      <Stack.Screen 
-        name="UserProfile" 
-        component={UserProfileScreen} 
-        options={{
-          headerShown: true,
-          headerTitle: "Profile",
-          headerTintColor: "white",
-          headerStyle: { backgroundColor: "rgba(57, 57, 57, 0.95)" },
-        }}
-      />
-    </Stack.Navigator>
+        {/* User Profile scherm */}
+        <Stack.Screen 
+          name="UserProfile" 
+          component={UserProfileScreen} 
+          options={{
+            headerShown: true,
+            headerTitle: "Profile",
+            headerTintColor: "white",
+            headerStyle: { backgroundColor: "rgba(57, 57, 57, 0.95)" },
+          }}
+        />
+        <Stack.Screen 
+          name="ArtistTagSelect" 
+          component={ArtistTagSelectScreen} 
+          options={{
+            headerShown: true,
+            headerTitle: "Profile",
+            headerTintColor: "white",
+          }}
+        />
+        <Stack.Screen 
+          name="GenreTagSelect" 
+          component={GenreTagSelectScreen} 
+          options={{
+            headerShown: true,
+            headerTitle: "Tags",
+            headerTintColor: "white",
+          }}
+        />
+      </Stack.Navigator>
+    </AuthProvider>
   );
 }
 

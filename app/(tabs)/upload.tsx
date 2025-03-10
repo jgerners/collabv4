@@ -8,23 +8,33 @@ import {
   StyleSheet,
   Dimensions,
   ScrollView,
+  Button,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import { supabase } from "../../supabaseClient";
+import { useNavigation } from "@react-navigation/native";
 
 const UploadScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
+
   const [uploadType, setUploadType] = useState<"video" | "photo">("video");
   const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
   const [selectedAudio, setSelectedAudio] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [selectedArtistTags, setSelectedArtistTags] = useState<string[]>([]);
+  const [selectedGenreTags, setSelectedGenreTags] = useState<string[]>([]);
+
   const windowWidth = Dimensions.get("window").width;
   const tabOrder: ("video" | "photo")[] = ["video", "photo"];
   const scrollViewRef = useRef<ScrollView>(null);
 
   const pickMedia = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsEditing: true,
       quality: 1,
@@ -35,14 +45,52 @@ const UploadScreen: React.FC = () => {
   };
 
   const pickAudio = async () => {
-    let result = await DocumentPicker.getDocumentAsync({ type: "audio/*" });
+    const result = await DocumentPicker.getDocumentAsync({ type: "audio/*" });
     if (!result.canceled && result.assets?.length > 0) {
       setSelectedAudio(result.assets[0].uri);
     }
   };
 
-  const handleUpload = () => {
-    console.log("Uploading...");
+  const handleUpload = async () => {
+    setUploading(true);
+    setError(null);
+
+    const newPost = {
+      id: Date.now().toString(),
+      userId: "1",
+      profileImage: "https://via.placeholder.com/100",
+      username: "Bruno Mars",
+      media: selectedMedia || "",
+      mediaUrl: selectedMedia || "",
+      mediaType: uploadType,
+      audioUrl: selectedAudio,
+      title,
+      description,
+      timestamp: new Date().toISOString(),
+      artistTags: selectedArtistTags,
+      genreTags: selectedGenreTags,
+      isLiked: false,
+      isFollowed: false,
+      isSaved: false,
+      isPlaying: false,
+    };
+
+    const { error: supabaseError } = await supabase
+      .from("posts")
+      .insert([newPost])
+      .select();
+
+    if (supabaseError) {
+      setError(supabaseError.message);
+    } else {
+      setTitle("");
+      setDescription("");
+      setSelectedMedia(null);
+      setSelectedAudio(null);
+      setSelectedArtistTags([]);
+      setSelectedGenreTags([]);
+    }
+    setUploading(false);
   };
 
   const handleMomentumScrollEnd = (event: any) => {
@@ -50,27 +98,60 @@ const UploadScreen: React.FC = () => {
     setUploadType(tabOrder[newIndex]);
   };
 
+  // Navigatieknoppen met callback doorgeven
+  const goToArtistTagSelect = () => {
+    navigation.navigate("ArtistTagSelect", {
+      onSave: (tags: string[]) => setSelectedArtistTags(tags),
+    });
+  };
+
+  const goToGenreTagSelect = () => {
+    navigation.navigate("GenreTagSelect", {
+      onSave: (tags: string[]) => setSelectedGenreTags(tags),
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* ✅ Toggle met Bubble + Swipe functionaliteit */}
       <View style={styles.toggleContainer}>
         {tabOrder.map((option) => (
           <TouchableOpacity
             key={option}
-            style={[styles.toggleButton, uploadType === option && styles.activeToggleButton]}
+            style={[
+              styles.toggleButton,
+              uploadType === option && styles.activeToggleButton,
+            ]}
             onPress={() => {
               setUploadType(option);
-              scrollViewRef.current?.scrollTo({ x: tabOrder.indexOf(option) * windowWidth, animated: true });
+              scrollViewRef.current?.scrollTo({
+                x: tabOrder.indexOf(option) * windowWidth,
+                animated: true,
+              });
             }}
           >
-            <Text style={[styles.toggleText, uploadType === option && styles.activeToggleText]}>
+            <Text
+              style={[
+                styles.toggleText,
+                uploadType === option && styles.activeToggleText,
+              ]}
+            >
               {option === "video" ? "Video Upload" : "Photo Upload"}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* ✅ Swipe functionaliteit */}
+      <View style={styles.tagsContainer}>
+        <Button title="Selecteer Artiest-Tags" onPress={goToArtistTagSelect} />
+        <Button title="Selecteer Genre-Tags" onPress={goToGenreTagSelect} />
+        <Text style={styles.infoText}>
+          Geselecteerde Artiest-Tags: {selectedArtistTags.join(", ")}
+        </Text>
+        <Text style={styles.infoText}>
+          Geselecteerde Genre-Tags: {selectedGenreTags.join(", ")}
+        </Text>
+      </View>
+
       <ScrollView
         horizontal
         pagingEnabled
@@ -79,10 +160,11 @@ const UploadScreen: React.FC = () => {
         contentOffset={{ x: windowWidth, y: 0 }}
         onMomentumScrollEnd={handleMomentumScrollEnd}
       >
-        {/* Video Upload Page */}
         <View style={{ width: windowWidth, padding: 20 }}>
           <TouchableOpacity style={styles.uploadBox} onPress={pickMedia}>
-            <Text style={styles.uploadText}>{selectedMedia ? "Change Media" : "Select Media"}</Text>
+            <Text style={styles.uploadText}>
+              {selectedMedia ? "Change Media" : "Select Media"}
+            </Text>
           </TouchableOpacity>
           <TextInput
             style={styles.input}
@@ -100,17 +182,23 @@ const UploadScreen: React.FC = () => {
             multiline
           />
           <TouchableOpacity style={styles.uploadButton} onPress={handleUpload}>
-            <Text style={styles.uploadButtonText}>Upload</Text>
+            <Text style={styles.uploadButtonText}>
+              {uploading ? "Uploading..." : "Upload"}
+            </Text>
           </TouchableOpacity>
+          {error && <Text style={styles.errorText}>Error: {error}</Text>}
         </View>
 
-        {/* Photo Upload Page */}
         <View style={{ width: windowWidth, padding: 20 }}>
           <TouchableOpacity style={styles.uploadBox} onPress={pickMedia}>
-            <Text style={styles.uploadText}>{selectedMedia ? "Change Media" : "Select Media"}</Text>
+            <Text style={styles.uploadText}>
+              {selectedMedia ? "Change Media" : "Select Media"}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.uploadBox} onPress={pickAudio}>
-            <Text style={styles.uploadText}>{selectedAudio ? "Change Audio" : "Select Audio"}</Text>
+            <Text style={styles.uploadText}>
+              {selectedAudio ? "Change Audio" : "Select Audio"}
+            </Text>
           </TouchableOpacity>
           <TextInput
             style={styles.input}
@@ -128,8 +216,11 @@ const UploadScreen: React.FC = () => {
             multiline
           />
           <TouchableOpacity style={styles.uploadButton} onPress={handleUpload}>
-            <Text style={styles.uploadButtonText}>Upload</Text>
+            <Text style={styles.uploadButtonText}>
+              {uploading ? "Uploading..." : "Upload"}
+            </Text>
           </TouchableOpacity>
+          {error && <Text style={styles.errorText}>Error: {error}</Text>}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -190,4 +281,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   uploadButtonText: { color: "#FFF", fontWeight: "bold" },
+  errorText: { color: "red", marginTop: 10 },
+  tagsContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  infoText: {
+    color: "#ccc",
+    marginVertical: 4,
+  },
 });

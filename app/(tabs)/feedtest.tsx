@@ -1,17 +1,14 @@
-import React, { useRef, useState } from "react";
-import { 
-  View, 
-  FlatList, 
-  Animated,
-  StyleSheet
-} from "react-native";
+import React, { useRef, useState, useEffect } from "react";
+import { View, FlatList, StyleSheet, Text } from "react-native";
 import { Video, Audio } from "expo-av";
-import users from "../../dummy_data/dummy_id";
 import PostComponent from "../../components/postcomponent";
+import { supabase } from "../../supabaseClient";
+import { useArtistTags } from "../../hooks/useArtistTags";
+import { useGenreTags } from "../../hooks/useGenreTags";
 
 interface Post {
   id: string;
-  userId: string ;
+  userId: string;
   profileImage: string | number;
   username: string;
   media: string | number;
@@ -21,46 +18,41 @@ interface Post {
   title: string;
   description: string;
   timestamp: number;
-  artistTags?: string[];
+  artistTags: string[];
   genreTags: string[];
   isLiked: boolean;
   isFollowed: boolean;
   isSaved: boolean;
-  isPlaying?: boolean;
+  isPlaying: boolean;
 }
 
-const extractPosts = (): Post[] => {
-  return users.flatMap(user => 
-    user.posts.map(post => ({
-      id: post.id,
-      userId: user.userId,  
-      profileImage: user.userProfile,
-      username: user.userName,
-      media: post.mediaUrl, 
-      mediaUrl: post.mediaUrl,
-      mediaType: post.mediaType,
-      audio: post.audioUrl,
-      title: post.title,
-      description: post.description,
-      artistTags: post.artistTags ?? [],
-      genreTags: post.genreTags || [],
-      timestamp: post.timestamp,
-      isLiked: false,
-      isFollowed: false,
-      isSaved: false,
-      isPlaying: false
-    }))
-  );
-};
-
 const FeedScreen: React.FC = () => {
-  const [posts, setPosts] = useState<Post[]>(extractPosts());
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
   const videoRefs = useRef<{ [key: string]: Video | null }>({});
   const audioRefs = useRef<{ [key: string]: Audio.Sound | null }>({});
 
+  // Gebruik de aparte hooks voor artist- en genretags
+  const { artistTags, loading: artistLoading, error: artistError } = useArtistTags();
+  const { genreTags, loading: genreLoading, error: genreError } = useGenreTags();
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      const { data, error } = await supabase.from("posts").select("*");
+      if (error) {
+        console.error("Error fetching posts:", error);
+      } else if (data) {
+        setPosts(data as Post[]);
+      }
+      setLoading(false);
+    };
+
+    fetchPosts();
+  }, []);
+
   const handlePlayPause = async (postId: string) => {
     const updatedPosts = await Promise.all(
-      posts.map(async post => {
+      posts.map(async (post) => {
         if (post.id === postId) {
           const newPlaying = !post.isPlaying;
           if (newPlaying) {
@@ -92,6 +84,18 @@ const FeedScreen: React.FC = () => {
     setPosts(updatedPosts as Post[]);
   };
 
+  if (loading || artistLoading || genreLoading) {
+    return (
+      <View style={styles.container}>
+        <Text style={{ color: "white" }}>Loading posts...</Text>
+      </View>
+    );
+  }
+
+  if (artistError || genreError) {
+    console.error("Error loading tags:", artistError || genreError);
+  }
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -101,14 +105,15 @@ const FeedScreen: React.FC = () => {
           <PostComponent 
             post={{
               ...item,
-              timestamp: item.timestamp.toString(),
               artistTags: item.artistTags ?? [],
-              genreTags: item.genreTags ?? []
+              genreTags: item.genreTags ?? [],
+              timestamp: item.timestamp.toString(),
             }}
             onPlayPause={handlePlayPause}
+            artistTags={artistTags}  // Geef de artist-tagdata mee
+            genreTags={genreTags}    // Geef de genre-tagdata mee
           />
         )}
-        
         decelerationRate="fast"
         snapToAlignment="start"
         showsVerticalScrollIndicator={false}

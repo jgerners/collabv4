@@ -1,4 +1,3 @@
-// postcomponent.tsx
 import React, { useRef, useState } from "react";
 import {
   View,
@@ -12,7 +11,7 @@ import {
 import { Video, ResizeMode, Audio } from "expo-av";
 import Icon from "react-native-vector-icons/Ionicons";
 
-// Importeer de losse componenten
+// Importeer de presentational componenten
 import ProfilePic from "./mainbuttons/profilepic";
 import Username from "./mainbuttons/username";
 import Follow from "./mainbuttons/follow";
@@ -22,23 +21,50 @@ import Collab from "./mainbuttons/collab";
 import Bookmark from "./mainbuttons/bookmark";
 import ArtistTag from "./mainbuttons/tags/artist_tags";
 import GenreTag from "./mainbuttons/tags/genre_tags";
-
-// Importeer de dummy data en maak helperfuncties
-import { dummyArtistTags, dummyGenreTags } from "../dummy_data/dummy_tags";
 import { useNavigation } from '@react-navigation/native';
 
-/* 
-  ProfileLink component:
-  - Dit is stap 2 en 3 samen: Het component maakt de profielinformatie klikbaar.
-  - Bij een klik navigeert het naar 'UserProfile' en geeft het de userId door.
-  - Hier gebruiken we post.username als identifier; vervang dit later eventueel met een echte userId.
-*/
-interface ProfileLinkProps {
-  userId: string;
-  children: React.ReactNode;
+// Importeer het Tag type (gebruik aparte types indien gewenst)
+export interface ArtistTagData {
+  id: string;
+  name: string;
+  image: string;
 }
 
-const ProfileLink: React.FC<ProfileLinkProps> = ({ userId, children }) => {
+export interface GenreTagData {
+  id: string;
+  name: string;
+}
+
+interface PostData {
+  id: string;
+  userId: string;
+  profileImage: string | number;
+  username: string;
+  media: string | number;
+  mediaUrl?: string | number;
+  mediaType?: "image" | "video" | "photo";
+  audio?: string | number;
+  title: string;
+  description: string;
+  artistTags?: string[]; // Hier staan de tag-ID's voor artiest-tags
+  genreTags: string[];   // Hier staan de tag-ID's voor genre-tags
+  timestamp: string;
+  isLiked: boolean;
+  isFollowed: boolean;
+  isSaved: boolean;
+  isPlaying?: boolean;
+}
+
+interface PostProps {
+  post: PostData;
+  onPlayPause: (postId: string) => Promise<void>;
+  artistTags: ArtistTagData[]; // Volledige lijst van artist-tags (via useArtistTags)
+  genreTags: GenreTagData[];   // Volledige lijst van genre-tags (via useGenreTags)
+}
+
+const DOUBLE_PRESS_DELAY = 300;
+
+const ProfileLink: React.FC<{ userId: string; children: React.ReactNode }> = ({ userId, children }) => {
   const navigation = useNavigation<any>();
   return (
     <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId })}>
@@ -47,33 +73,7 @@ const ProfileLink: React.FC<ProfileLinkProps> = ({ userId, children }) => {
   );
 };
 
-interface PostProps {
-  post: {
-    id: string;
-    userId: string;
-    profileImage: string | number;
-    username: string;
-    media: string | number;
-    mediaUrl?: string | number;
-    mediaType?: "image" | "video" | "photo";
-    audio?: string | number;
-    title: string;
-    description: string;
-    artistTags?: string[];
-    genreTags: string[];
-    timestamp: string;
-    isLiked: boolean;
-    isFollowed: boolean;
-    isSaved: boolean;
-    isPlaying?: boolean;
-  };
-  onPlayPause: (postId: string) => Promise<void>;
-}
-
-const DOUBLE_PRESS_DELAY = 300;
-
-const PostComponent: React.FC<PostProps> = ({ post, onPlayPause }) => {
- 
+const PostComponent: React.FC<PostProps> = ({ post, onPlayPause, artistTags, genreTags }) => {
   const [liked, setLiked] = useState(post.isLiked);
   const [followed, setFollowed] = useState(post.isFollowed);
   const [saved, setSaved] = useState(post.isSaved);
@@ -86,11 +86,11 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause }) => {
   const videoRef = useRef<Video | null>(null);
   const audioRef = useRef<Audio.Sound | null>(null);
 
-  // Helpers om tagobjecten te vinden via ID
+  // Helper functies: Zoek in de via props doorgegeven taglijsten
   const getArtistTagById = (id: string) =>
-    dummyArtistTags.find((tag) => tag.id === id);
+    (artistTags || []).find((tag) => tag.id === id);
   const getGenreTagById = (id: string) =>
-    dummyGenreTags.find((tag) => tag.id === id);
+    (genreTags || []).find((tag) => tag.id === id);
 
   const handlePlayPause = async () => {
     if (post.mediaType === "video" && videoRef.current) {
@@ -157,7 +157,6 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause }) => {
       {/* Post Header */}
       <View style={styles.postHeader}>
         <View style={styles.profileContainer}>
-          {/* Stap 3: ProfileLink wordt hier gebruikt om te navigeren naar UserProfile */}
           <ProfileLink userId={post.userId}>
             <ProfilePic source={post.profileImage} />
           </ProfileLink>
@@ -165,7 +164,6 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause }) => {
             <Username username={post.username} />
           </ProfileLink>
         </View>
-        {/* Header Buttons: Like en Follow */}
         <View style={styles.headerButtons}>
           <Like isLiked={liked} onPress={() => setLiked(!liked)} />
           <Follow isFollowed={followed} onPress={() => setFollowed(!followed)} />
@@ -202,10 +200,7 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause }) => {
 
       {/* Like Animation */}
       <Animated.View
-        style={[
-          styles.heartContainer,
-          { transform: [{ scale: heartScale }] },
-        ]}
+        style={[styles.heartContainer, { transform: [{ scale: heartScale }] }]}
       >
         <Icon name="heart" size={50} color="red" />
       </Animated.View>
@@ -216,7 +211,7 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause }) => {
         <Text style={styles.timestampText}> {post.timestamp}</Text>
       </View>
 
-      {/* Post Details: Titel en uitklapbare description */}
+      {/* Post Details */}
       <View style={styles.postDetails}>
         <Text style={styles.postTitle} numberOfLines={2} ellipsizeMode="tail">
           {post.title}
@@ -228,7 +223,7 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause }) => {
         >
           {post.description}
         </Text>
-        <TouchableOpacity onPress={() => setDescriptionExpanded((prev) => !prev)}>
+        <TouchableOpacity onPress={() => setDescriptionExpanded(prev => !prev)}>
           <Text style={styles.seeMoreText}>
             {descriptionExpanded ? "See less" : "See more"}
           </Text>
@@ -237,7 +232,7 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause }) => {
 
       {/* Tags */}
       <View style={styles.tagsContainer}>
-        {post.artistTags?.map((tagId, index) => {
+        {(post.artistTags || []).map((tagId, index) => {
           const foundTag = getArtistTagById(tagId);
           if (!foundTag) return null;
           return (
@@ -245,11 +240,11 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause }) => {
               key={`artist-${index}`}
               id={foundTag.id}
               name={foundTag.name}
-              image={foundTag.image}
+              image={foundTag.image || ""}
             />
           );
         })}
-        {post.genreTags?.map((tagId, index) => {
+        {(post.genreTags || []).map((tagId, index) => {
           const foundTag = getGenreTagById(tagId);
           if (!foundTag) return null;
           return (
@@ -262,9 +257,9 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause }) => {
         })}
       </View>
 
-      {/* Post Actions: Collab knop rechts onderin */}
+      {/* Post Actions: Collab knop */}
       <View style={styles.postActions}>
-        <Collab onPress={() => { /* Voeg hier de collab functionaliteit toe */ }} />
+        <Collab onPress={() => { /* Voeg hier collab functionaliteit toe */ }} />
       </View>
     </View>
   );
@@ -348,7 +343,7 @@ const styles = StyleSheet.create({
   postActions: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end", // Plaats de knop rechts
+    justifyContent: "flex-end",
     bottom: 33,
   },
 });

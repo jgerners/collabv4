@@ -4,6 +4,18 @@ export type RootStackParamList = {
     UserProfile: { userId: string };
     Chat: { chatId: string }; // Voeg deze regel toe
     // Andere schermen kunnen we hier later toevoegen.
+
+    
+   
+   
+    Upload: {
+      selectedArtistTags?: string[];
+      selectedGenreTags?: string[];
+    };
+    
+    ArtistTagSelect: undefined;  // <-- Toegevoegd
+    GenreTagSelect: undefined;   // <-- Toegevoegd
     
   };
+
 
