@@ -1,19 +1,14 @@
 import React, { useState } from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
-import { useAuth } from "../../context/authContext"; // Controleer het pad
 
 export default function ProfileScreen() {
   const [selectedTab, setSelectedTab] = useState("Demos");
-  const { signOut } = useAuth();
 
   return (
     <View style={styles.container}>
-      {/* Header met logout-knop */}
+      {/* Header zonder logout-knop */}
       <View style={styles.header}>
         <Text style={styles.profileText}>Profile</Text>
-        <TouchableOpacity onPress={signOut} style={styles.logoutButton}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Profielfoto */}
@@ -63,30 +58,11 @@ const styles = StyleSheet.create({
   header: {
     width: "90%",
     marginBottom: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    // Debug: voeg een border toe zodat je de header ziet
-    borderWidth: 1,
-    borderColor: "red",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
   },
   profileText: {
     color: "white",
     fontSize: 20,
-    fontWeight: "bold",
-  },
-  logoutButton: {
-    padding: 8,
-    backgroundColor: "#A020F0", // Dit is de kleur die je wilde gebruiken
-    borderRadius: 5,
-    // Debug: voeg een border toe zodat je het kunt zien
-    borderWidth: 1,
-    borderColor: "yellow",
-  },
-  logoutText: {
-    color: "white",
     fontWeight: "bold",
   },
   profileImageContainer: {
