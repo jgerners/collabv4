@@ -15,6 +15,8 @@ export type RootStackParamList = {
     
     ArtistTagSelect: undefined;  // <-- Toegevoegd
     GenreTagSelect: undefined;   // <-- Toegevoegd
+    Login: undefined; 
+    Register: undefined; 
     
   };
 
