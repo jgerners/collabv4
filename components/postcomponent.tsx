@@ -10,8 +10,8 @@ import {
 } from "react-native";
 import { Video, ResizeMode, Audio } from "expo-av";
 import Icon from "react-native-vector-icons/Ionicons";
+import { useNavigation } from "@react-navigation/native";
 
-// Importeer de presentational componenten
 import ProfilePic from "./mainbuttons/profilepic";
 import Username from "./mainbuttons/username";
 import Follow from "./mainbuttons/follow";
@@ -21,9 +21,7 @@ import Collab from "./mainbuttons/collab";
 import Bookmark from "./mainbuttons/bookmark";
 import ArtistTag from "./mainbuttons/tags/artist_tags";
 import GenreTag from "./mainbuttons/tags/genre_tags";
-import { useNavigation } from '@react-navigation/native';
 
-// Importeer het Tag type (gebruik aparte types indien gewenst)
 export interface ArtistTagData {
   id: string;
   name: string;
@@ -38,7 +36,7 @@ export interface GenreTagData {
 interface PostData {
   id: string;
   userId: string;
-  profileImage: string 
+  profileImage: string;
   username: string;
   media: string | number;
   mediaUrl?: string | number;
@@ -46,8 +44,8 @@ interface PostData {
   audio?: string | number;
   title: string;
   description: string;
-  artistTags?: string[]; // Hier staan de tag-ID's voor artiest-tags
-  genreTags: string[];   // Hier staan de tag-ID's voor genre-tags
+  artistTags?: string[];
+  genreTags: string[];
   timestamp: string;
   isLiked: boolean;
   isFollowed: boolean;
@@ -58,8 +56,8 @@ interface PostData {
 interface PostProps {
   post: PostData;
   onPlayPause: (postId: string) => Promise<void>;
-  artistTags: ArtistTagData[]; // Volledige lijst van artist-tags (via useArtistTags)
-  genreTags: GenreTagData[];   // Volledige lijst van genre-tags (via useGenreTags)
+  artistTags: ArtistTagData[];
+  genreTags: GenreTagData[];
 }
 
 const DOUBLE_PRESS_DELAY = 300;
@@ -67,7 +65,7 @@ const DOUBLE_PRESS_DELAY = 300;
 const ProfileLink: React.FC<{ userId: string; children: React.ReactNode }> = ({ userId, children }) => {
   const navigation = useNavigation<any>();
   return (
-    <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId })}>
+    <TouchableOpacity onPress={() => navigation.navigate("UserProfile", { userId })}>
       {children}
     </TouchableOpacity>
   );
@@ -76,7 +74,6 @@ const ProfileLink: React.FC<{ userId: string; children: React.ReactNode }> = ({ 
 const PostComponent: React.FC<PostProps> = ({ post, onPlayPause, artistTags, genreTags }) => {
   const [liked, setLiked] = useState(post.isLiked);
   const [followed, setFollowed] = useState(post.isFollowed);
-  const [saved, setSaved] = useState(post.isSaved);
   const [isPlaying, setIsPlaying] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
@@ -86,70 +83,15 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause, artistTags, gen
   const videoRef = useRef<Video | null>(null);
   const audioRef = useRef<Audio.Sound | null>(null);
 
-  // Helper functies: Zoek in de via props doorgegeven taglijsten
-  const getArtistTagById = (id: string) =>
-    (artistTags || []).find((tag) => tag.id === id);
-  const getGenreTagById = (id: string) =>
-    (genreTags || []).find((tag) => tag.id === id);
+  const getArtistTagById = (id: string) => artistTags.find((tag) => tag.id === id);
+  const getGenreTagById = (id: string) => genreTags.find((tag) => tag.id === id);
 
   const handlePlayPause = async () => {
     if (post.mediaType === "video" && videoRef.current) {
-      if (isPlaying) {
-        await videoRef.current.pauseAsync();
-      } else {
-        await videoRef.current.playAsync();
-      }
-    } else if (post.mediaType === "image" && post.audio) {
-      if (!audioRef.current) {
-        const { sound } = await Audio.Sound.createAsync(
-          typeof post.audio === "string" ? { uri: post.audio } : post.audio,
-          { shouldPlay: true, isLooping: false }
-        );
-        audioRef.current = sound;
-      } else {
-        isPlaying
-          ? await audioRef.current.pauseAsync()
-          : await audioRef.current.playAsync();
-      }
+      isPlaying ? await videoRef.current.pauseAsync() : await videoRef.current.playAsync();
     }
     setIsPlaying(!isPlaying);
     onPlayPause(post.id);
-  };
-
-  const triggerHeartAnimation = () => {
-    heartScale.setValue(0);
-    Animated.sequence([
-      Animated.timing(heartScale, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(heartScale, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  const handleTap = () => {
-    const now = Date.now();
-    if (lastTap.current && now - lastTap.current < DOUBLE_PRESS_DELAY) {
-      if (tapTimeout.current) {
-        clearTimeout(tapTimeout.current);
-        tapTimeout.current = null;
-      }
-      lastTap.current = null;
-      triggerHeartAnimation();
-      setLiked(!liked);
-    } else {
-      lastTap.current = now;
-      tapTimeout.current = setTimeout(() => {
-        handlePlayPause();
-        lastTap.current = null;
-        tapTimeout.current = null;
-      }, DOUBLE_PRESS_DELAY);
-    }
   };
 
   return (
@@ -158,10 +100,10 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause, artistTags, gen
       <View style={styles.postHeader}>
         <View style={styles.profileContainer}>
           <ProfileLink userId={post.userId}>
-            <ProfilePic uri={post.profileImage} />
+            <Image source={{ uri: post.profileImage }} style={styles.profileImage} />
           </ProfileLink>
           <ProfileLink userId={post.userId}>
-            <Username name={post.username} />
+            <Text style={styles.usernameText}>{post.username}</Text>
           </ProfileLink>
         </View>
         <View style={styles.headerButtons}>
@@ -171,95 +113,49 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause, artistTags, gen
       </View>
 
       {/* Media */}
-      <Pressable onPress={handleTap} style={styles.mediaContainer}>
+      <Pressable onPress={handlePlayPause} style={styles.mediaContainer}>
         {post.mediaType === "video" ? (
           <Video
             ref={videoRef}
-            source={
-              typeof post.media === "string"
-                ? { uri: post.media }
-                : post.media
-            }
+            source={{ uri: post.mediaUrl as string }}
             style={styles.media}
-            resizeMode={ResizeMode.COVER}
+            resizeMode={ResizeMode.CONTAIN}
             shouldPlay={false}
             isLooping
+            useNativeControls
           />
         ) : (
-          <Image
-            source={
-              typeof post.media === "string"
-                ? { uri: post.media }
-                : post.media
-            }
-            style={styles.media}
-          />
+          <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
         )}
         <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
       </Pressable>
 
-      {/* Like Animation */}
-      <Animated.View
-        style={[styles.heartContainer, { transform: [{ scale: heartScale }] }]}
-      >
-        <Icon name="heart" size={50} color="red" />
-      </Animated.View>
-
-      {/* Timestamp */}
-      <View style={styles.timestampContainer}>
-        <Icon name="time-outline" size={12} color="white" />
-        <Text style={styles.timestampText}> {post.timestamp}</Text>
-      </View>
-
       {/* Post Details */}
       <View style={styles.postDetails}>
-        <Text style={styles.postTitle} numberOfLines={2} ellipsizeMode="tail">
-          {post.title}
-        </Text>
-        <Text
-          style={styles.postDescription}
-          numberOfLines={descriptionExpanded ? undefined : 2}
-          ellipsizeMode="tail"
-        >
+        <Text style={styles.postTitle}>{post.title}</Text>
+        <Text style={styles.postDescription} numberOfLines={descriptionExpanded ? undefined : 2}>
           {post.description}
         </Text>
-        <TouchableOpacity onPress={() => setDescriptionExpanded(prev => !prev)}>
-          <Text style={styles.seeMoreText}>
-            {descriptionExpanded ? "See less" : "See more"}
-          </Text>
+        <TouchableOpacity onPress={() => setDescriptionExpanded(!descriptionExpanded)}>
+          <Text style={styles.seeMoreText}>{descriptionExpanded ? "See less" : "See more"}</Text>
         </TouchableOpacity>
       </View>
 
       {/* Tags */}
       <View style={styles.tagsContainer}>
-        {(post.artistTags || []).map((tagId, index) => {
+        {post.artistTags?.map((tagId, index) => {
           const foundTag = getArtistTagById(tagId);
-          if (!foundTag) return null;
-          return (
-            <ArtistTag
-              key={`artist-${index}`}
-              id={foundTag.id}
-              name={foundTag.name}
-              image={foundTag.image || ""}
-            />
-          );
+          return foundTag ? <ArtistTag key={index} id={foundTag.id} name={foundTag.name} image={foundTag.image} /> : null;
         })}
-        {(post.genreTags || []).map((tagId, index) => {
+        {post.genreTags?.map((tagId, index) => {
           const foundTag = getGenreTagById(tagId);
-          if (!foundTag) return null;
-          return (
-            <GenreTag
-              key={`genre-${index}`}
-              id={foundTag.id}
-              name={foundTag.name}
-            />
-          );
+          return foundTag ? <GenreTag key={index} id={foundTag.id} name={foundTag.name} /> : null;
         })}
       </View>
 
-      {/* Post Actions: Collab knop */}
+      {/* Collab Button */}
       <View style={styles.postActions}>
-        <Collab onPress={() => { /* Voeg hier collab functionaliteit toe */ }} />
+        <Collab onPress={() => {}} />
       </View>
     </View>
   );
@@ -279,31 +175,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    top: -5,
+    marginBottom: 10,
   },
   profileContainer: {
     flexDirection: "row",
     alignItems: "center",
   },
-  headerButtons: {
-    flexDirection: "row",
-    alignItems: "center",
+  profileImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
   },
-  tagsContainer: {
-    borderRadius: 5,
-    marginTop: 10,
-    flexDirection: "row",
-    flexWrap: "wrap",
+  usernameText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
   mediaContainer: {
     width: "100%",
-    height: "60%",
+    aspectRatio: 1, // ✅ Zorgt ervoor dat de hoogte altijd gelijk is aan de breedte (vierkant)
     borderRadius: 10,
     overflow: "hidden",
+    backgroundColor: "#000",
   },
   media: {
     width: "100%",
     height: "100%",
+    resizeMode: "cover",
   },
   postDetails: {
     marginTop: 10,
@@ -317,34 +216,26 @@ const styles = StyleSheet.create({
   postDescription: {
     color: "gray",
     fontSize: 14,
-    marginTop: 5,
+    marginBottom: 5,
   },
   seeMoreText: {
     color: "white",
     fontSize: 12,
     marginTop: 4,
   },
-  timestampContainer: {
+  tagsContainer: {
     flexDirection: "row",
-    alignItems: "center",
+    flexWrap: "wrap",
     marginTop: 10,
-  },
-  timestampText: {
-    color: "white",
-    fontSize: 12,
-    marginLeft: 5,
-  },
-  heartContainer: {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: [{ translateX: -25 }, { translateY: -25 }],
   },
   postActions: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "flex-end",
-    bottom: 33,
+    marginTop: 10,
+  },
+  headerButtons: {  // ✅ Dit was eerder niet gedefinieerd
+    flexDirection: "row",
+    alignItems: "center",
   },
 });
 

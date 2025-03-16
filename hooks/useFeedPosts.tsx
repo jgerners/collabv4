@@ -1,8 +1,7 @@
-// usePosts.ts
-import { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
+import { useState, useEffect } from "react";
+import { supabase } from "../supabaseClient";
 
-// Definieer een interface voor je Post (pas dit aan naar jouw dummy data interface)
+// Definieer de interface voor een Post
 export interface Post {
   id: string;
   userId: string;
@@ -10,7 +9,7 @@ export interface Post {
   username: string;
   media: string | number;
   mediaUrl: string | number;
-  mediaType: 'photo' | 'video';
+  mediaType: "photo" | "video";
   audio?: string | number;
   title: string;
   description: string;
@@ -30,14 +29,57 @@ export const usePosts = () => {
 
   useEffect(() => {
     const fetchPosts = async () => {
+      console.log("🔄 fetchPosts() wordt aangeroepen...");
       const { data, error } = await supabase
-        .from('posts')
-        .select('*');
+        .from("posts")
+        .select(`
+          id,
+          userId, 
+          media,
+          mediaUrl,
+          mediaType,
+          audioUrl,
+          title,
+          description,
+          timestamp,
+          artistTags,
+          genreTags,
+          isLiked,
+          isFollowed,
+          isSaved,
+          isPlaying,
+          profiles(username, profile_pic)
+        `)
+        .order("timestamp", { ascending: false });
+
       if (error) {
-        console.error("Error fetching posts:", error);
+        console.error("❌ Fout bij ophalen posts:", error);
         setError(error.message);
       } else {
-        setPosts(data as Post[]);
+        console.log("📥 Opgehaalde posts:", JSON.stringify(data, null, 2));
+
+        // 🔹 Data correct mappen naar de `Post` interface
+        const mappedPosts: Post[] = data.map((post: any) => ({
+          id: post.id,
+          userId: post.userID, // Correcte naamgeving
+          profileImage: post.users?.profile_pic || "https://via.placeholder.com/50", // Default afbeelding als fallback
+          username: post.users?.username || "Onbekend",
+          media: post.media,
+          mediaUrl: post.mediaurl, // Fix voor mediaUrl
+          mediaType: post.mediatype, // Fix voor mediaType
+          audio: post.audiourl,
+          title: post.title,
+          description: post.description,
+          timestamp: post.timestamp,
+          artistTags: post.artistTags ?? [],
+          genreTags: post.genreTags ?? [],
+          isLiked: post.isLiked,
+          isFollowed: post.isFollowed,
+          isSaved: post.isSaved,
+          isPlaying: post.isPlaying,
+        }));
+
+        setPosts(mappedPosts);
       }
       setLoading(false);
     };
