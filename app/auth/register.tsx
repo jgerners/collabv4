@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, Button, StyleSheet } from "react-native";
-import { router } from "expo-router"; // ✅ Voor navigatie
-import { useAuth } from "../../context/authContext"; // ✅ Zorg dat dit pad klopt
+import { useNavigation, NavigationProp } from "@react-navigation/native";
+import { RootStackParamList } from "../../routes"; // Zorg dat dit pad correct is!
+import { useAuth } from "../../context/authContext";
 
 export default function RegisterScreen() {
   const { signUp } = useAuth();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>(); // ✅ Correct getypeerd
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -12,7 +14,7 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     try {
       await signUp(email, password);
-      router.replace("/(tabs)/feedtest"); // ✅ Stuur gebruiker na registratie naar de feed
+      navigation.navigate; "Main"; // ✅ Navigatie na registratie
     } catch (err) {
       setError("Registratie mislukt. Probeer een ander e-mailadres.");
     }
@@ -41,12 +43,11 @@ export default function RegisterScreen() {
       />
       <Button title="Account aanmaken" onPress={handleRegister} />
       <Text style={styles.loginText}>
-  Heb je al een account?{" "}
-  <Text style={styles.loginLink} onPress={() => router.push("/auth/login")}>
-    Log hier in
-  </Text>
-</Text>
-
+        Heb je al een account?{" "}
+        <Text style={styles.loginLink} onPress={() => navigation.navigate("Login")}>
+          Log hier in
+        </Text>
+      </Text>
     </View>
   );
 }
@@ -56,25 +57,22 @@ const styles = StyleSheet.create({
   title: { color: "white", fontSize: 24, marginBottom: 20 },
   input: { backgroundColor: "#1E1E1E", color: "white", padding: 10, marginBottom: 10, width: "80%", borderRadius: 5 },
   error: { color: "red", marginBottom: 10 },
-  link: { color: "#A020F0", marginTop: 10, textDecorationLine: "underline" },
   registerText: {
     color: "white",
     textAlign: "center",
     marginTop: 10,
   },
   registerLink: {
-    color: "#A020F0", // Paarse kleur
+    color: "#A020F0",
     fontWeight: "bold",
   },
-  
   loginText: {
     color: "white",
     textAlign: "center",
     marginTop: 10,
   },
   loginLink: {
-    color: "#A020F0", // Paarse kleur
+    color: "#A020F0",
     fontWeight: "bold",
   },
-  
 });

@@ -1,10 +1,12 @@
 import { View, Text, TextInput, Button, StyleSheet } from "react-native";
 import { useState } from "react";
 import { useAuth } from "../../context/authContext";
-import { router } from "expo-router";
+import { useNavigation, NavigationProp } from "@react-navigation/native";
+import { RootStackParamList } from "../../routes"; // Zorg dat dit pad correct is!
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>(); // ✅ Correct getypeerd
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -12,7 +14,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     try {
       await signIn(email, password);
-      router.replace("/(tabs)/feedtest"); // Stuur gebruiker naar de feed na inloggen
+      navigation.navigate; "Main"; // ✅ Navigatie na login
     } catch (err) {
       setError("Login mislukt. Controleer je gegevens.");
     }
@@ -26,16 +28,14 @@ export default function LoginScreen() {
       <TextInput style={styles.input} placeholder="Wachtwoord" secureTextEntry onChangeText={setPassword} />
       <Button title="Login" onPress={handleLogin} />
       <Text style={styles.registerText}>
-  Nog geen account?{" "}
-  <Text style={styles.registerLink} onPress={() => router.push("/auth/register")}>
-    Registreer hier
-  </Text>
-</Text>
-
+        Nog geen account?{" "}
+        <Text style={styles.registerLink} onPress={() => navigation.navigate("Register")}>
+          Registreer hier
+        </Text>
+      </Text>
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#121212" },
@@ -48,18 +48,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   registerLink: {
-    color: "#A020F0", // Paarse kleur
+    color: "#A020F0",
     fontWeight: "bold",
   },
-  
-  loginText: {
-    color: "white",
-    textAlign: "center",
-    marginTop: 10,
-  },
-  loginLink: {
-    color: "#A020F0", // Paarse kleur
-    fontWeight: "bold",
-  },
-  
 });
