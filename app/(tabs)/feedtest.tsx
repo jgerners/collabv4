@@ -9,7 +9,7 @@ import { useGenreTags } from "../../hooks/useGenreTags";
 interface Post {
   id: string;
   userId: string;
-  profileImage: string | number;
+  profileImage: string 
   username: string;
   media: string | number;
   mediaUrl: string | number;

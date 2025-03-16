@@ -3,11 +3,11 @@ import React from "react";
 import { Text, StyleSheet } from "react-native";
 
 interface UsernameProps {
-  username: string;
+  name: string;
 }
 
-const Username: React.FC<UsernameProps> = ({ username }) => {
-  return <Text style={styles.username}>{username}</Text>;
+const Username: React.FC<UsernameProps> = ({ name }) => {
+  return <Text style={styles.username}>{name}</Text>;
 };
 
 const styles = StyleSheet.create({

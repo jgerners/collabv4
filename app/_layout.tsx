@@ -21,14 +21,14 @@ import GenreTagSelectScreen from "./screens/genreTagSelect";
 import LoginScreen from "./auth/login"; // ✅ Login
 import RegisterScreen from "./auth/register"; // ✅ Register
 
-const userProfileImage = require('../assets/dummy/profile/skip_profiel.jpg');
-
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
 // ✅ Tab-navigatie (Alleen zichtbaar als de gebruiker is ingelogd)
 function TabsLayout() {
   const colorScheme = useColorScheme();
+  const { profile } = useAuth(); // ✅ Profielfoto ophalen
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -48,7 +48,10 @@ function TabsLayout() {
         headerRight: () => (
           <View style={styles.headerRightContainer}>
             <TouchableOpacity>
-              <Image source={userProfileImage} style={styles.profileImage} />
+              <Image
+                source={{ uri: profile?.profile_pic || "https://via.placeholder.com/100" }} // ✅ Profielfoto dynamisch maken
+                style={styles.profileImage}
+              />
             </TouchableOpacity>
             <TouchableOpacity style={{ marginLeft: 15 }}>
               <IconSymbol size={24} name="magnifyingglass" color="white" />
@@ -98,7 +101,7 @@ function TabsLayout() {
 
 // ✅ AppNavigatie met Auth-check
 function AuthNavigator() {
-  const { session, loading } = useAuth();
+  const { user, loading } = useAuth();
 
   // ✅ Voorkom dat de app laadt voordat de sessie bekend is
   if (loading) {
@@ -112,7 +115,7 @@ function AuthNavigator() {
   return (
     <Stack.Navigator>
       {/* ✅ Als GEEN sessie → Toon Login/Register */}
-      {!session ? (
+      {!user ? (
         <>
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />

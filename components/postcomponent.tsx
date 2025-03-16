@@ -38,7 +38,7 @@ export interface GenreTagData {
 interface PostData {
   id: string;
   userId: string;
-  profileImage: string | number;
+  profileImage: string 
   username: string;
   media: string | number;
   mediaUrl?: string | number;
@@ -158,10 +158,10 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause, artistTags, gen
       <View style={styles.postHeader}>
         <View style={styles.profileContainer}>
           <ProfileLink userId={post.userId}>
-            <ProfilePic source={post.profileImage} />
+            <ProfilePic uri={post.profileImage} />
           </ProfileLink>
           <ProfileLink userId={post.userId}>
-            <Username username={post.username} />
+            <Username name={post.username} />
           </ProfileLink>
         </View>
         <View style={styles.headerButtons}>

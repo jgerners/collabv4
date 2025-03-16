@@ -14,10 +14,13 @@ import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { supabase } from "../../supabaseClient";
 import { useNavigation } from "@react-navigation/native";
+import { useAuth } from "../../context/authContext"; // ✅ AuthContext importeren
+
+
 
 const UploadScreen: React.FC = () => {
+  const { user } = useAuth(); // ✅ Haal de ingelogde gebruiker op
   const navigation = useNavigation<any>();
-
   const [uploadType, setUploadType] = useState<"video" | "photo">("video");
   const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
   const [selectedAudio, setSelectedAudio] = useState<string | null>(null);
@@ -52,14 +55,16 @@ const UploadScreen: React.FC = () => {
   };
 
   const handleUpload = async () => {
+    if (!user) {
+      setError("Je moet ingelogd zijn om een post te plaatsen.");
+      return;
+    }
+  
     setUploading(true);
     setError(null);
 
     const newPost = {
-      id: Date.now().toString(),
-      userId: "1",
-      profileImage: "https://via.placeholder.com/100",
-      username: "Bruno Mars",
+      userId: user?.id,
       media: selectedMedia || "",
       mediaUrl: selectedMedia || "",
       mediaType: uploadType,

@@ -3,23 +3,25 @@ import React from "react";
 import { Image, StyleSheet } from "react-native";
 
 interface ProfilePicProps {
-  source: string | number;
+  uri: string ; 
 }
 
-const ProfilePic: React.FC<ProfilePicProps> = ({ source }) => {
+const ProfilePic: React.FC<ProfilePicProps> = ({ uri }) => {
   return (
     <Image
-      source={typeof source === "string" ? { uri: source } : source}
+    source={{ uri }}
       style={styles.profilePic}
+      resizeMode="cover"
     />
   );
 };
 
 const styles = StyleSheet.create({
   profilePic: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: "100%",
+    height: "100%",
+    borderRadius: 50,
+    overflow: "hidden", // ✅ Voorkomt dat de afbeelding buiten het rondje valt
   },
 });
 

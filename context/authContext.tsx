@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
-import { Session } from "@supabase/supabase-js"; // ✅ Gebruik het juiste type voor sessies
+import { Session, User } from "@supabase/supabase-js";
 
 interface AuthContextType {
   session: Session | null;
+  user: User | null;
+  profile: any | null; // ✅ Profielgegevens toevoegen
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
@@ -14,9 +16,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true); // ✅ Voorkomt dat de app raar flikkert bij opstarten
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<any | null>(null); // ✅ Profiel state toevoegen
+  const [loading, setLoading] = useState(true);
 
-  // ✅ Haal de huidige sessie op bij opstarten
+  // ✅ Haal de huidige sessie en user op bij opstarten
   useEffect(() => {
     const getSession = async () => {
       const { data, error } = await supabase.auth.getSession();
@@ -25,6 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         console.log("🔵 Initial session:", data.session);
         setSession(data.session);
+        setUser(data.session?.user || null);
       }
       setLoading(false);
     };
@@ -35,6 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log("🟡 Auth state changed, new session:", session);
       setSession(session);
+      setUser(session?.user || null);
     });
 
     return () => {
@@ -42,11 +48,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  // ✅ Haal profielgegevens op uit `profiles`
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) return;
+
+      let { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id) // ✅ Haal profiel op met dezelfde id als de gebruiker
+        .single();
+
+      if (error) {
+        console.error("❌ Error fetching profile:", error);
+      } else {
+        console.log("🟢 Profiel geladen:", data);
+        setProfile(data);
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
+
   // ✅ Inloggen
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      setUser(data.user); // ✅ User opslaan na inloggen
     } catch (error) {
       console.error("❌ Error signing in:", error);
       throw error;
@@ -56,8 +85,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ✅ Registreren
   const signUp = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
+      setUser(data.user); // ✅ User opslaan na registreren
     } catch (error) {
       console.error("❌ Error signing up:", error);
       throw error;
@@ -74,6 +104,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         console.log("✅ User signed out successfully");
         setSession(null);
+        setUser(null);
+        setProfile(null); // ✅ Profiel resetten na uitloggen
       }
     } catch (error) {
       console.error("❌ Unexpected error signing out:", error);
@@ -81,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ session, user, profile, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

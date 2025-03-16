@@ -1,29 +1,29 @@
 import React, { useState } from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useAuth } from "../../context/authContext"; // ✅ User ophalen
+import ProfilePic from "../../components/mainbuttons/profilepic"; // ✅ Gebruik je component
+import Username from "../../components/mainbuttons/username"; // ✅ Gebruik je component
 
 export default function ProfileScreen() {
+  const { profile } = useAuth(); // ✅ Haal de ingelogde gebruiker op
   const [selectedTab, setSelectedTab] = useState("Demos");
 
   return (
     <View style={styles.container}>
-      {/* Header zonder logout-knop */}
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.profileText}>Profile</Text>
+      <Text style={styles.profileText}>{profile?.username || "Gebruiker"}</Text>
       </View>
 
       {/* Profielfoto */}
       <TouchableOpacity style={styles.profileImageContainer}>
-        <Image
-          source={{ uri: "https://via.placeholder.com/100" }}
-          style={styles.profileImage}
-        />
-        <Text style={styles.addIcon}>+</Text>
+      <ProfilePic uri={profile?.profile_pic || "https://via.placeholder.com/100"} />
       </TouchableOpacity>
 
       {/* Gebruikersinformatie */}
-      <Text style={styles.username}>skipvdv</Text>
-      <Text style={styles.role}>Producer</Text>
-      <Text style={styles.location}>Producer from the Netherlands</Text>
+      <Text style={styles.displayname}>{profile?.display_name || "Geen display naam"}</Text>
+      <Text style={styles.role}>{profile?.role || "Onbekende rol"}</Text>
+      <Text style={styles.bio}>{profile?.bio || "Geen bio beschikbaar"}</Text>
 
       {/* Tabs */}
       <View style={styles.tabs}>
@@ -75,27 +75,15 @@ const styles = StyleSheet.create({
     position: "relative",
     marginBottom: 10,
   },
-  profileImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-  },
-  addIcon: {
-    position: "absolute",
-    fontSize: 24,
+  displayname: {
     color: "white",
-    bottom: 5,
-  },
-  username: {
-    color: "white",
-    fontSize: 22,
-    fontWeight: "bold",
+    fontSize: 18,
   },
   role: {
     color: "gray",
     fontSize: 16,
   },
-  location: {
+  bio: {
     color: "gray",
     fontSize: 14,
     marginBottom: 20,
