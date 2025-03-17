@@ -1,49 +1,70 @@
-// UserProfileScreen.tsx
-import React from "react";
-import { View, Text, Image, StyleSheet } from "react-native";
-import { RootStackParamList } from "../../routes";
-import { RouteProp } from "@react-navigation/native";
+import React, { useEffect, useState } from "react";
+import { View, Text, Image, StyleSheet, ActivityIndicator } from "react-native";
+import { useRoute } from "@react-navigation/native";
+import { supabase } from "../../supabaseClient";
 
-// Stel dat je dummy gebruikersdata hebt; importeer die
-import dummyUsers from "../../dummy_data/dummy_id";
+const UserProfileScreen = () => {
+  const route = useRoute();
+  const { userId } = route.params as { userId: string };
 
-type UserProfileRouteProp = RouteProp<RootStackParamList, 'UserProfile'>;
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-interface UserProfileScreenProps {
-  route: UserProfileRouteProp;
-}
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      console.log("📡 Ophalen profielgegevens voor:", userId);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
 
+      if (error) {
+        console.error("❌ Fout bij ophalen profiel:", error);
+        setError(error.message);
+      } else {
+        console.log("✅ Profielgegevens opgehaald:", data);
+        setProfile(data);
+      }
+      setLoading(false);
+    };
 
-const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ route }) => {
-  // Stap 1: Haal de userId uit de route parameters
+    fetchUserProfile();
+  }, [userId]);
 
-  const { userId } = route.params;
-
-  // Stap 2: Zoek de gebruiker in je dummy data op basis van de userId
-  const user = dummyUsers.find((u) => u.userId === userId);
-
-  if (!user) {
+  if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>User not found</Text>
+        <ActivityIndicator size="large" color="#fff" />
       </View>
     );
   }
 
-  // Stap 3: Weergeef de profielgegevens van de gebruiker
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>❌ {error}</Text>
+      </View>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>❌ Gebruiker niet gevonden</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Image
-        source={
-          typeof user.userProfile === "string"
-            ? { uri: user.userProfile }
-            : user.userProfile
-        }
+        source={{ uri: profile.profile_pic || "https://via.placeholder.com/100" }}
         style={styles.profileImage}
       />
-      <Text style={styles.username}>{user.userName}</Text>
-      <Text style={styles.bio}>{user.bio}</Text>
-      {/* Voeg hier eventueel meer profielinformatie toe, zoals posts of contactgegevens */}
+      <Text style={styles.username}>{profile.username || "Geen naam gevonden"}</Text>
+      <Text style={styles.bio}>{profile.bio || "Geen bio beschikbaar"}</Text>
     </View>
   );
 };
@@ -69,6 +90,8 @@ const styles = StyleSheet.create({
   bio: {
     color: "gray",
     fontSize: 16,
+    textAlign: "center",
+    marginHorizontal: 20,
   },
   errorText: {
     color: "red",
