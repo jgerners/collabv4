@@ -1,42 +1,45 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList } from "../app/(tabs)/chat_list"; // ✅ Zorg dat deze import correct is
+import { RootStackParamList } from "../app/(tabs)/chat_list";
+import { useCollabRequests, CollabRequest } from "../hooks/useCollabRequests"; // Zorg dat deze hook correct is
+import { useAuth } from "../context/authContext";
 
-// 📌 Definieer het request-type
-interface Request {
-  id: string;
-  userName: string;
-  userProfile: string | number;
-  postImage: string | number; // ✅ Toegevoegd voor media van de post
-}
-
-// 📌 Dummy requests-data
-const dummyRequests: Request[] = [
-  { id: "1", userName: "Charlie Puth", userProfile: require("../assets/dummy/profile/dua_profile.png"), postImage: require("../assets/dummy/profile/dua_profile.png") },
-  { id: "2", userName: "Ariana Grande", userProfile: require("../assets/dummy/profile/dua_profile.png"), postImage: require("../assets/dummy/profile/dua_profile.png") },
-];
+import ProfileLink from "./profileLink";
 
 const Requests: React.FC = () => {
-  const [requests, setRequests] = useState<Request[]>(dummyRequests);
+  
+  
+  const { user } = useAuth();
+  const receiverId = user!.id; // Zorg dat dit een string is; eventueel een fallback indien nodig
+  
+  const { requests, loading, error } = useCollabRequests(receiverId);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
-  // 📌 Request accepteren -> Chat starten + verwijderen uit lijst
-  const acceptRequest = (id: string, userName: string) => {
-    setRequests((prevRequests) => prevRequests.filter((req) => req.id !== id));
+  // Request accepteren -> update de status in de database en navigeer naar ChatScreen
+  const acceptRequest = (id: string) => {
+    // Hier roep je eventueel een update-functie aan die de request status op "accepted" zet
     navigation.navigate("Chat", { chatId: id });
   };
 
-  // 📌 Request afwijzen -> Verwijderen uit lijst
+  // Request afwijzen -> update de status in de database of verwijder het request
   const rejectRequest = (id: string) => {
-    setRequests((prevRequests) => prevRequests.filter((req) => req.id !== id));
+    // Roep hier een update-functie aan die de request status op "rejected" zet
   };
 
-  // 📌 Profiel bekijken -> Navigeren naar profielpagina
-  const viewProfile = (id: string) => {
-    navigation.navigate("Profile", { userId: id });
+  // Profiel bekijken -> Navigeren naar profielpagina
+  const viewProfile = (userId: string) => {
+    navigation.navigate("Profile", { userId });
   };
+
+  if (loading) {
+    return <Text style={styles.emptyText}>Loading requests...</Text>;
+  }
+
+  if (error) {
+    return <Text style={styles.emptyText}>Error: {error}</Text>;
+  }
 
   if (requests.length === 0) {
     return <Text style={styles.emptyText}>No requests yet.</Text>;
@@ -45,23 +48,29 @@ const Requests: React.FC = () => {
   return (
     <FlatList
       data={requests}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
+      keyExtractor={(item: CollabRequest) => item.id}
+      renderItem={({ item }: { item: CollabRequest }) => (
         <View style={styles.requestItem}>
           {/* 🔥 Profielfoto en gebruikersnaam */}
           <View style={styles.userContainer}>
-            <Image
-              source={typeof item.userProfile === "string" ? { uri: item.userProfile } : item.userProfile}
-              style={styles.profileImage}
-            />
-            <Text style={styles.userName}>{item.userName}</Text>
-            
-            
-            
+          <ProfileLink userId={item.sender_Id}>
+           <Image
+              source={
+              typeof item.userProfile === "string"
+            ? { uri: item.userProfile }
+            : item.userProfile
+             }
+                  style={styles.profileImage}
+                                              />
+          </ProfileLink>
+           
+          <ProfileLink userId={item.sender_Id}>
+             <Text style={styles.userName}>{item.userName}</Text>
+                </ProfileLink>
 
             {/* 📌 Accept & Reject buttons */}
             <View style={styles.buttonsContainer}>
-              <TouchableOpacity style={styles.acceptButton} onPress={() => acceptRequest(item.id, item.userName)}>
+              <TouchableOpacity style={styles.acceptButton} onPress={() => acceptRequest(item.id)}>
                 <Text style={styles.buttonText}>Accept</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.rejectButton} onPress={() => rejectRequest(item.id)}>
@@ -70,17 +79,19 @@ const Requests: React.FC = () => {
             </View>
           </View>
           <Text style={styles.collabText}>wants to collab with you</Text>
-
           {/* 🔥 Post-media (rechts) */}
           <Image
-            source={typeof item.postImage === "string" ? { uri: item.postImage } : item.postImage}
+            source={
+              typeof item.postImage === "string"
+                ? { uri: item.postImage }
+                : item.postImage
+            }
             style={styles.postImage}
           />
-
           {/* 🔥 Check Music knop */}
-          <TouchableOpacity onPress={() => viewProfile(item.id)}>
-            <Text style={styles.checkMusicText}>Check {item.userName}'s music</Text>
-          </TouchableOpacity>
+          <ProfileLink userId={item.sender_Id}>
+             <Text style={styles.checkMusicText}>Check {item.userName}'s music</Text>
+          </ProfileLink>
         </View>
       )}
     />
@@ -103,9 +114,8 @@ const styles = StyleSheet.create({
     borderRadius: 12, 
     marginBottom: 12, 
     width: "100%", 
-    aspectRatio: 1, // 🔥 Dit maakt de hoogte automatisch gelijk aan de breedte
+    aspectRatio: 1, // Maakt de hoogte gelijk aan de breedte
     alignItems: "center",
-   
   },
   userContainer: {
     flexDirection: "row", 
@@ -135,8 +145,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, 
     borderRadius: 6, 
     marginRight: 6,
-
-    
   },
   rejectButton: { 
     backgroundColor: "#595959", 
@@ -176,5 +184,4 @@ const styles = StyleSheet.create({
     bottom: 20,
     right: 50
   }
-  
 });

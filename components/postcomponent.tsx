@@ -12,6 +12,8 @@ import { Video, ResizeMode, Audio } from "expo-av";
 import Icon from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 
+import { useAuth } from "../context/authContext";
+
 import ProfilePic from "./mainbuttons/profilepic";
 import Username from "./mainbuttons/username";
 import Follow from "./mainbuttons/follow";
@@ -21,6 +23,9 @@ import Collab from "./mainbuttons/collab";
 import Bookmark from "./mainbuttons/bookmark";
 import ArtistTag from "./mainbuttons/tags/artist_tags";
 import GenreTag from "./mainbuttons/tags/genre_tags";
+
+import ProfileLink from "./profileLink";
+
 
 export interface ArtistTagData {
   id: string;
@@ -62,16 +67,11 @@ interface PostProps {
 
 const DOUBLE_PRESS_DELAY = 300;
 
-const ProfileLink: React.FC<{ userId: string; children: React.ReactNode }> = ({ userId, children }) => {
-  const navigation = useNavigation<any>();
-  return (
-    <TouchableOpacity onPress={() => navigation.navigate("UserProfile", { userId })}>
-      {children}
-    </TouchableOpacity>
-  );
-};
+
 
 const PostComponent: React.FC<PostProps> = ({ post, onPlayPause, artistTags, genreTags }) => {
+  const { user } = useAuth(); // user bevat bijvoorbeeld de ingelogde gebruiker
+  const currentUserId = user?.id; // haal het id op
   const [liked, setLiked] = useState(post.isLiked);
   const [followed, setFollowed] = useState(post.isFollowed);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -158,7 +158,17 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause, artistTags, gen
 
       {/* Collab Button */}
       <View style={styles.postActions}>
-        <Collab onPress={() => {}} />
+      { currentUserId ? (
+  <Collab 
+    senderId={currentUserId} 
+    receiverId={post.userId} 
+    postId={post.id} 
+  />
+) : (
+  <TouchableOpacity style={styles.collabButtonDisabled} disabled={true}>
+    <Text style={styles.collabText}>LOGIN TO COLLAB!</Text>
+  </TouchableOpacity>
+)}
       </View>
     </View>
   );
@@ -241,6 +251,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  collabButtonDisabled: {},
+  collabText: {}
   
 });
 
