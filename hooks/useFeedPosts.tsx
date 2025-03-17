@@ -3,9 +3,10 @@ import { supabase } from "../supabaseClient";
 
 // Definieer de interface voor een Post
 export interface Post {
+  [x: string]: any;
   id: string;
   userId: string;
-  profileImage: string | number;
+  profileImage: string 
   username: string;
   media: string | number;
   mediaUrl: string | number;
@@ -61,9 +62,9 @@ export const usePosts = () => {
         // 🔹 Data correct mappen naar de `Post` interface
         const mappedPosts: Post[] = data.map((post: any) => ({
           id: post.id,
-          userId: post.userID, // Correcte naamgeving
-          profileImage: post.users?.profile_pic || "https://via.placeholder.com/50", // Default afbeelding als fallback
-          username: post.users?.username || "Onbekend",
+          userId: post.userId, // Correcte naamgeving
+          profileImage: post.profiles?.profile_pic || "https://via.placeholder.com/50",
+          username: post.profiles?.username || "Onbekend",
           media: post.media,
           mediaUrl: post.mediaurl, // Fix voor mediaUrl
           mediaType: post.mediatype, // Fix voor mediaType

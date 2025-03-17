@@ -93,14 +93,17 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause, artistTags, gen
     setIsPlaying(!isPlaying);
     onPlayPause(post.id);
   };
-
+ 
+  
   return (
     <View style={styles.postContainer}>
       {/* Post Header */}
       <View style={styles.postHeader}>
         <View style={styles.profileContainer}>
           <ProfileLink userId={post.userId}>
-            <Image source={{ uri: post.profileImage }} style={styles.profileImage} />
+            <Image 
+            source={{ uri: post.profileImage }} 
+            style={{ width: 30, height: 30, borderRadius: 15 }} /> 
           </ProfileLink>
           <ProfileLink userId={post.userId}>
             <Text style={styles.usernameText}>{post.username}</Text>
@@ -189,8 +192,9 @@ const styles = StyleSheet.create({
   },
   usernameText: {
     color: "white",
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: "bold",
+    marginLeft: 5
   },
   mediaContainer: {
     width: "100%",
@@ -237,6 +241,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  
 });
 
 export default PostComponent;

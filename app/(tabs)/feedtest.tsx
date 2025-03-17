@@ -15,7 +15,7 @@ const FeedScreen: React.FC = () => {
   const { artistTags, loading: artistLoading, error: artistError } = useArtistTags();
   const { genreTags, loading: genreLoading, error: genreError } = useGenreTags();
 
-  console.log("🔥 FeedScreen geladen, aantal posts:", posts.length);
+  
 
   const handlePlayPause = async (postId: string) => {
     const updatedPosts = posts.map((post) => {
@@ -48,7 +48,7 @@ const FeedScreen: React.FC = () => {
       return post;
     });
 
-    console.log("🎵 Play state updated", updatedPosts);
+    
   };
 
   if (loading || artistLoading || genreLoading) {
@@ -66,26 +66,31 @@ const FeedScreen: React.FC = () => {
       </View>
     );
   }
-
+  
   return (
     <View style={styles.container}>
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <PostComponent 
-            post={{
-              ...item,
-              profileImage: typeof item.profileImage === "string" ? item.profileImage : item.profileImage.toString(), // ✅ Zorgt ervoor dat het een string is
-              artistTags: item.artistTags ?? [],
-              genreTags: item.genreTags ?? [],
-              timestamp: item.timestamp.toString(), // ✅ Zorgt dat timestamp correct wordt weergegeven
-            }}
-            onPlayPause={handlePlayPause}
-            artistTags={artistTags}  
-            genreTags={genreTags}    
-          />
-        )}
+        renderItem={({ item }) => {
+          
+          return (
+            <PostComponent 
+              post={{
+                ...item,
+                userId: item.userId, // ✅ Fix: Zorg ervoor dat userId niet verdwijnt!
+                username: item.username || "Onbekend",  // ✅ Haalt de username correct uit 'profiles'
+                profileImage: item.profileImage || "https://via.placeholder.com/50",  // ✅ Profielfoto correct uit 'profiles'
+                artistTags: item.artistTags ?? [],
+                genreTags: item.genreTags ?? [],
+                timestamp: item.timestamp.toString(), // ✅ Zorgt dat timestamp correct wordt weergegeven
+              }}
+              onPlayPause={handlePlayPause}
+              artistTags={artistTags}  
+              genreTags={genreTags}    
+            />
+          );
+        }}
         decelerationRate="fast"
         snapToAlignment="start"
         showsVerticalScrollIndicator={false}
