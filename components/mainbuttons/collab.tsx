@@ -16,13 +16,13 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
   // Realtime abonnement zodat je updates krijgt als de status verandert in de database
   useEffect(() => {
     const subscription = supabase
-      .channel("collab-requests_channel")
+      .channel("collab_requests_channel")
       .on(
         "postgres_changes",
         {
           event: "UPDATE",
           schema: "public",
-          table: "collab-requests",
+          table: "collab_requests",
           filter: `sender_id=eq.${senderId}`,
         },
         (payload: any) => {
@@ -45,7 +45,7 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
       return;
     }
     const { data, error } = await supabase
-      .from("collab-requests")
+      .from("collab_requests")
       .insert([
         {
           sender_Id: senderId,

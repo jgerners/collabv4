@@ -1,5 +1,4 @@
-// ChatScreen.tsx
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   SafeAreaView,
   View,
@@ -12,45 +11,94 @@ import {
   StyleSheet,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
+import { useRoute } from "@react-navigation/native";
+import { supabase } from "../../supabaseClient";
+import { useAuth } from "../../context/authContext";
 
-// Hoogtes die invloed hebben op je layout (pas deze indien nodig aan)
-const HEADER_HEIGHT = 110;
-const TABBAR_HEIGHT = 80;
-
-// Interface voor berichten
 interface Message {
   id: string;
-  text: string;
-  sender: string;
-  timestamp: number;
+  chat_id: string;
+  sender_id: string;
+  message: string;
+  created_at: string;
 }
 
-
-
 const ChatScreen: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      text: "That sounds so fire!!! 🔥",
-      sender: "other",
-      timestamp: Date.now() - 60000,
-    },
-  ]);
+  const route = useRoute();
+  const { chatId } = route.params as { chatId: string };
+  const { user } = useAuth();
+  const currentUserId = user?.id || "";
+  
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const flatListRef = useRef<FlatList>(null);
 
-  const handleSend = () => {
+  // Functie om berichten op te halen
+  const fetchMessages = async () => {
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .select("*")
+      .eq("chat_id", chatId)
+      .order("created_at", { ascending: true });
+    if (error) {
+      console.error("Error fetching messages:", error);
+    } else if (data) {
+      setMessages(data as Message[]);
+    }
+  };
+
+  useEffect(() => {
+    fetchMessages();
+  }, [chatId]);
+
+  // Realtime abonnement: Luister naar INSERTs in chat_messages voor dit chatId
+  useEffect(() => {
+    const subscription = supabase
+      .channel("chat_messages_channel")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+          filter: `chat_id=eq.'${chatId}'`,
+        },
+        (payload: any) => {
+          console.log("Realtime insert payload:", payload);
+          setMessages((prevMessages) => [...prevMessages, payload.new]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [chatId]);
+
+  const handleSend = async () => {
     if (inputText.trim().length === 0) return;
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: inputText,
-      sender: "me",
-      timestamp: Date.now(),
-    };
+    // Verstuur bericht naar de database
+    const { error } = await supabase
+      .from("chat_messages")
+      .insert([
+        {
+          chat_id: chatId,
+          sender_id: currentUserId,
+          message: inputText,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select("*");
 
-    setMessages((prevMessages) => [...prevMessages, newMessage]);
+    if (error) {
+      console.error("Error sending message:", error);
+      return;
+    }
     setInputText("");
+
+    // Fallback: haal de berichten opnieuw op zodat de UI direct up-to-date is
+    fetchMessages();
 
     // Scroll naar beneden zodat het nieuwe bericht zichtbaar is
     setTimeout(() => {
@@ -59,7 +107,7 @@ const ChatScreen: React.FC = () => {
   };
 
   const renderItem = ({ item }: { item: Message }) => {
-    const isCurrentUser = item.sender === "me";
+    const isCurrentUser = item.sender_id === currentUserId;
     return (
       <View
         style={[
@@ -67,7 +115,7 @@ const ChatScreen: React.FC = () => {
           isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble,
         ]}
       >
-        <Text style={styles.messageText}>{item.text}</Text>
+        <Text style={styles.messageText}>{item.message}</Text>
       </View>
     );
   };
@@ -119,9 +167,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    // Deze marges zorgen ervoor dat de inhoud niet achter de header of tabbar valt
-    marginTop: HEADER_HEIGHT - 60,
-  
+    marginTop: 50, // Pas aan indien nodig
   },
   keyboardAvoid: {
     flex: 1,
