@@ -26,7 +26,6 @@ import GenreTag from "./mainbuttons/tags/genre_tags";
 
 import ProfileLink from "./profileLink";
 
-
 export interface ArtistTagData {
   id: string;
   name: string;

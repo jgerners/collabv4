@@ -3,10 +3,20 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useAuth } from "../../context/authContext"; // ✅ User ophalen
 import ProfilePic from "../../components/mainbuttons/profilepic"; // ✅ Gebruik je component
 import Username from "../../components/mainbuttons/username"; // ✅ Gebruik je component
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { RootStackParamList } from "../../routes";
+
+
+
+
+
 
 export default function ProfileScreen() {
   const { profile } = useAuth(); // ✅ Haal de ingelogde gebruiker op
   const [selectedTab, setSelectedTab] = useState("Demos");
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  
 
   return (
     <View style={styles.container}>
@@ -24,6 +34,14 @@ export default function ProfileScreen() {
       <Text style={styles.displayname}>{profile?.display_name || "Geen display naam"}</Text>
       <Text style={styles.role}>{profile?.role || "Onbekende rol"}</Text>
       <Text style={styles.bio}>{profile?.bio || "Geen bio beschikbaar"}</Text>
+
+           {/* Edit Profile knop */}
+           <TouchableOpacity
+        style={styles.editProfileButton}
+        onPress={() => navigation.navigate("EditProfile")}
+      >
+        <Text style={styles.editProfileText}>Edit Profile</Text>
+      </TouchableOpacity>
 
       {/* Tabs */}
       <View style={styles.tabs}>
@@ -87,6 +105,18 @@ const styles = StyleSheet.create({
     color: "gray",
     fontSize: 14,
     marginBottom: 20,
+  },
+
+  editProfileButton: {
+    backgroundColor: "#A020F0",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  editProfileText: {
+    color: "white",
+    fontWeight: "bold",
   },
   tabs: {
     flexDirection: "row",

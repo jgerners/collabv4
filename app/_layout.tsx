@@ -8,6 +8,7 @@ import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { RootStackParamList } from '../routes';
 import { AuthProvider, useAuth } from '../context/authContext'; // ✅ Import AuthContext
+import  EditProfile  from "./screens/editprofile";
 
 // 📌 Screens Importeren
 import FeedScreen from './(tabs)/feedtest';
@@ -145,6 +146,12 @@ function AuthNavigator() {
               headerStyle: { backgroundColor: "rgba(57, 57, 57, 0.95)" },
             }}
           />
+          <Stack.Screen 
+            name="EditProfile" 
+            component={EditProfile} 
+            options={{ headerShown: false }} 
+/>
+
           <Stack.Screen 
             name="ArtistTagSelect" 
             component={ArtistTagSelectScreen} 

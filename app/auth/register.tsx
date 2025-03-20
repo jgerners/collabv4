@@ -6,7 +6,7 @@ import { useAuth } from "../../context/authContext";
 
 export default function RegisterScreen() {
   const { signUp } = useAuth();
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>(); // ✅ Correct getypeerd
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>(); // Correct getypeerd
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +14,8 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     try {
       await signUp(email, password);
-      navigation.navigate; "Main"; // ✅ Navigatie na registratie
+      // Na succesvolle registratie navigeer direct naar EditProfile
+      navigation.navigate("EditProfile");
     } catch (err) {
       setError("Registratie mislukt. Probeer een ander e-mailadres.");
     }
@@ -57,22 +58,6 @@ const styles = StyleSheet.create({
   title: { color: "white", fontSize: 24, marginBottom: 20 },
   input: { backgroundColor: "#1E1E1E", color: "white", padding: 10, marginBottom: 10, width: "80%", borderRadius: 5 },
   error: { color: "red", marginBottom: 10 },
-  registerText: {
-    color: "white",
-    textAlign: "center",
-    marginTop: 10,
-  },
-  registerLink: {
-    color: "#A020F0",
-    fontWeight: "bold",
-  },
-  loginText: {
-    color: "white",
-    textAlign: "center",
-    marginTop: 10,
-  },
-  loginLink: {
-    color: "#A020F0",
-    fontWeight: "bold",
-  },
+  loginText: { color: "white", textAlign: "center", marginTop: 10 },
+  loginLink: { color: "#A020F0", fontWeight: "bold" },
 });
