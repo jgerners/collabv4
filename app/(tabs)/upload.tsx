@@ -16,6 +16,70 @@ import { supabase } from "../../supabaseClient";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../context/authContext"; // ✅ AuthContext importeren
 
+// Nieuwe helper functie om een pre-signed URL op te halen
+// Nieuwe helper functie om een pre-signed URL op te halen
+const getPresignedUrl = async (uniqueName: string, contentType: string): Promise<string | null> => {
+  try {
+    const response = await fetch(
+      `http://192.168.178.166:3002/get-presigned-url?fileName=${encodeURIComponent(uniqueName)}&contentType=${encodeURIComponent(contentType)}`
+    );
+    const json = await response.json();
+    return json.url;
+  } catch (error) {
+    console.error("Error fetching presigned URL:", error);
+    return null;
+  }
+};
+
+// Nieuwe helper functie om het bestand naar AWS S3 te uploaden via de pre-signed URL
+const uploadFileToS3 = async (fileUri: string, folder: string): Promise<string | null> => {
+  try {
+    console.log("uploadFileToS3 gestart voor:", fileUri, "in folder:", folder);
+
+    // Haal het bestand op als blob
+    const response = await fetch(fileUri);
+    const blob = await response.blob();
+    console.log("Blob verkregen, size:", blob.size);
+
+    // Genereer een unieke bestandsnaam
+    const fileName = fileUri.split("/").pop();
+    const uniqueName = `${folder}/${Date.now()}_${fileName}`;
+    console.log("UniqueName gegenereerd:", uniqueName);
+
+    // Bepaal het content-type; gebruik blob.type of een fallback
+    const contentType = blob.type || "application/octet-stream";
+
+    // Verkrijg de pre-signed URL van je backend
+    const presignedUrl = await getPresignedUrl(uniqueName, contentType);
+    if (!presignedUrl) {
+      throw new Error("Geen pre-signed URL ontvangen");
+    }
+    console.log("Presigned URL ontvangen:", presignedUrl);
+
+    // Upload het bestand naar S3 via een PUT-request
+    const uploadResponse = await fetch(presignedUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": contentType,
+      },
+      body: blob,
+    });
+
+    if (!uploadResponse.ok) {
+      console.error("Upload naar S3 mislukt:", uploadResponse.statusText);
+      return null;
+    }
+
+    // Stel de publieke URL samen (pas dit aan met jouw bucketnaam)
+    const publicUrl = `https://collabpostmedia.s3.amazonaws.com/${uniqueName}`;
+    console.log("Publieke URL verkregen:", publicUrl);
+    return publicUrl;
+  } catch (err) {
+    console.error("Error in uploadFileToS3:", err);
+    return null;
+  }
+};
+
 
 
 const UploadScreen: React.FC = () => {
@@ -28,7 +92,6 @@ const UploadScreen: React.FC = () => {
   const [description, setDescription] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [selectedArtistTags, setSelectedArtistTags] = useState<string[]>([]);
   const [selectedGenreTags, setSelectedGenreTags] = useState<string[]>([]);
 
@@ -37,38 +100,80 @@ const UploadScreen: React.FC = () => {
   const scrollViewRef = useRef<ScrollView>(null);
 
   const pickMedia = async () => {
+    console.log("pickMedia gestart");
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsEditing: true,
       quality: 1,
     });
+    console.log("Result van ImagePicker:", result);
     if (!result.canceled) {
+      console.log("Media geselecteerd:", result.assets[0].uri);
       setSelectedMedia(result.assets[0].uri);
     }
   };
 
   const pickAudio = async () => {
+    console.log("pickAudio gestart");
     const result = await DocumentPicker.getDocumentAsync({ type: "audio/*" });
+    console.log("Result van DocumentPicker:", result);
     if (!result.canceled && result.assets?.length > 0) {
+      console.log("Audio geselecteerd:", result.assets[0].uri);
       setSelectedAudio(result.assets[0].uri);
     }
   };
 
   const handleUpload = async () => {
+   
+    
     if (!user) {
       setError("Je moet ingelogd zijn om een post te plaatsen.");
+      
       return;
     }
-  
+    
     setUploading(true);
     setError(null);
-
+    
+    let mediaPublicUrl = "";
+    let audioPublicUrl = "";
+    
+    if (selectedMedia) {
+      console.log("Geselecteerde media URI:", selectedMedia);
+      const folder = uploadType === "video" ? "videos" : "images";
+      const url = await uploadFileToS3(selectedMedia, folder);
+      console.log("Media URL van uploadFileToBucket:", url);
+      if (url) {
+        mediaPublicUrl = url;
+      } else {
+        setError("Fout bij uploaden van media.");
+        setUploading(false);
+        return;
+      }
+    }
+    
+    if (selectedAudio) {
+      console.log("Geselecteerde audio URI:", selectedAudio);
+      const url = await uploadFileToS3(selectedAudio, "audio");
+      console.log("Audio URL van uploadFileToBucket:", url);
+      if (url) {
+        audioPublicUrl = url;
+      } else {
+        setError("Fout bij uploaden van audio.");
+        setUploading(false);
+        return;
+      }
+    }
+    
+    console.log("mediaPublicUrl:", mediaPublicUrl);
+    console.log("audioPublicUrl:", audioPublicUrl);
+    
     const newPost = {
       userId: user?.id,
-      media: selectedMedia || "",
-      mediaUrl: selectedMedia || "",
+      media: mediaPublicUrl,
+      mediaUrl: mediaPublicUrl,
       mediaType: uploadType,
-      audioUrl: selectedAudio,
+      audioUrl: audioPublicUrl,
       title,
       description,
       timestamp: new Date().toISOString(),
@@ -79,23 +184,33 @@ const UploadScreen: React.FC = () => {
       isSaved: false,
       isPlaying: false,
     };
-
-    const { error: supabaseError } = await supabase
-      .from("posts")
-      .insert([newPost])
-      .select();
-
-    if (supabaseError) {
-      setError(supabaseError.message);
-    } else {
-      setTitle("");
-      setDescription("");
-      setSelectedMedia(null);
-      setSelectedAudio(null);
-      setSelectedArtistTags([]);
-      setSelectedGenreTags([]);
+    
+    console.log("Nieuwe post object:", newPost);
+    
+    try {
+      const { error: supabaseError } = await supabase
+        .from("posts")
+        .insert([newPost])
+        .select();
+      if (supabaseError) {
+        setError(supabaseError.message);
+        console.error("Database insert error:", supabaseError);
+      } else {
+        console.log("Post succesvol aangemaakt");
+        setTitle("");
+        setDescription("");
+        setSelectedMedia(null);
+        setSelectedAudio(null);
+        setSelectedArtistTags([]);
+        setSelectedGenreTags([]);
+      }
+    } catch (err) {
+      console.error("Fout bij post-insert:", err);
+      setError("Er is iets misgegaan bij het opslaan van de post.");
     }
+    
     setUploading(false);
+    console.log("handleUpload beëindigd");
   };
 
   const handleMomentumScrollEnd = (event: any) => {

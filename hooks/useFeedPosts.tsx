@@ -66,9 +66,9 @@ export const usePosts = () => {
           profileImage: post.profiles?.profile_pic || "https://via.placeholder.com/50",
           username: post.profiles?.username || "Onbekend",
           media: post.media,
-          mediaUrl: post.mediaurl, // Fix voor mediaUrl
-          mediaType: post.mediatype, // Fix voor mediaType
-          audio: post.audiourl,
+          mediaUrl: post.mediaUrl, // Fix voor mediaUrl
+          mediaType: post.mediaType, // Fix voor mediaType
+          audio: post.audioUrl,
           title: post.title,
           description: post.description,
           timestamp: post.timestamp,
