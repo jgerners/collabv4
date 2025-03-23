@@ -11,6 +11,7 @@ import {
 import { Video, ResizeMode, Audio } from "expo-av";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/authContext";
+import Slider from "@react-native-community/slider";
 
 import ProfileLink from "./profileLink";
 import Like from "./mainbuttons/like";
@@ -79,6 +80,15 @@ const PostComponent: React.FC<PostProps> = ({
   const audioRef = useRef<Audio.Sound | null>(null);
   const heartScale = useRef(new Animated.Value(0)).current;
 
+  // Deze state bepaalt of de seekbar zichtbaar is
+  const [showSlider, setShowSlider] = useState(false);
+  // Een Animated.Value voor de opacity van de seekbar
+  const sliderOpacity = useRef(new Animated.Value(0)).current;
+  // Houdt de totale duur van de media bij
+  const [duration, setDuration] = useState(0);
+  // Houdt de huidige positie (in millis) bij
+  const [currentTime, setCurrentTime] = useState(0);
+
   // Handmatige play/pause functie (wanneer de gebruiker tikt)
   const handlePlayPause = async () => {
     if (post.mediaType === "video" && videoRef.current) {
@@ -128,8 +138,38 @@ const PostComponent: React.FC<PostProps> = ({
     }
   };
 
+  const updatePlaybackStatus = (status: any) => {
+    if (status.isLoaded) {
+      setCurrentTime(status.positionMillis);
+      setDuration(status.durationMillis);
+    }
+  };
+
+  // Functie om de seekbar te tonen
+  const showSeekbar = () => {
+    setShowSlider(true);
+    Animated.timing(sliderOpacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+
+    // Verberg de seekbar na 3 seconden
+    setTimeout(() => {
+      Animated.timing(sliderOpacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => setShowSlider(false));
+    }, 3000);
+  };
+
+  // Gebruik een long press om de seekbar te tonen
+  const handleMediaPress = () => {
+    showSeekbar();
+  };
+
   // useEffect voor automatische play/pause op basis van scroll (isActive)
-  // We checken nu ook of de media al speelt (isPlaying) voordat we de media resetten.
   useEffect(() => {
     if (isActive) {
       // Alleen auto-play als er geen handmatige pauze is en de media nog niet speelt
@@ -140,36 +180,26 @@ const PostComponent: React.FC<PostProps> = ({
           awaitOrIgnore(() => videoRef.current!.playAsync());
           setIsPlaying(true);
         } else if (post.mediaType === "photo" && post.audio) {
-          const handleAudio = async () => {
-            if (audioRef.current) {
-              console.log(`Auto-restarting audio for post ${post.id} from beginning`);
-              try {
-                await audioRef.current.setPositionAsync(0);
-                await audioRef.current.playAsync();
-                setIsPlaying(true);
-              } catch (error) {
-                console.error("Error restarting audio:", error);
-              }
-            } else {
+          // Voor foto-posts: laad audio alleen als deze nog niet bestaat
+          if (!audioRef.current) {
+            const handleAudio = async () => {
               console.log(`Auto-loading and playing audio for post ${post.id} from beginning`);
               try {
-                const audioUri =
-                  typeof post.audio === "string" ? post.audio : post.audio!.toString();
+                const audioUri = typeof post.audio === "string" ? post.audio : post.audio!.toString();
                 const { sound } = await Audio.Sound.createAsync(
                   { uri: audioUri },
                   { shouldPlay: true }
                 );
                 audioRef.current = sound;
                 setIsPlaying(true);
-                sound.setOnPlaybackStatusUpdate((status) => {
-                  console.log(`Playback status for post ${post.id}:`, status);
-                });
+                // Gebruik updatePlaybackStatus zodat de slider ook werkt
+                sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
               } catch (error) {
                 console.error("Error auto-loading audio:", error);
               }
-            }
-          };
-          handleAudio();
+            };
+            handleAudio();
+          }
         }
       }
     } else {
@@ -190,12 +220,19 @@ const PostComponent: React.FC<PostProps> = ({
     }
   }, [isActive, manualPaused, isPlaying, post.mediaType, post.audio, post.id]);
 
-  // Als de post inactief wordt, reset de handmatige override zodat bij terugkomen auto-play mogelijk is
+  // Reset handmatige pauze als de post inactief wordt
   useEffect(() => {
     if (!isActive && manualPaused) {
       setManualPaused(false);
     }
   }, [isActive]);
+
+  useEffect(() => {
+    if (post.mediaType === "video" && videoRef.current) {
+      videoRef.current.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+    }
+    // Voor foto-posts met audio wordt de status update ingesteld bij het laden van de audio
+  }, [post.mediaType]);
 
   return (
     <View style={styles.postContainer}>
@@ -203,9 +240,9 @@ const PostComponent: React.FC<PostProps> = ({
       <View style={styles.postHeader}>
         <View style={styles.profileContainer}>
           <ProfileLink userId={post.userId}>
-            <Image 
-              source={{ uri: post.profileImage }} 
-              style={{ width: 30, height: 30, borderRadius: 15 }} 
+            <Image
+              source={{ uri: post.profileImage }}
+              style={{ width: 30, height: 30, borderRadius: 15 }}
             />
           </ProfileLink>
           <ProfileLink userId={post.userId}>
@@ -219,22 +256,55 @@ const PostComponent: React.FC<PostProps> = ({
       </View>
 
       {/* Media */}
-      <Pressable onPress={handlePlayPause} style={styles.mediaContainer}>
+      <Pressable
+        onPress={handlePlayPause}
+        onLongPress={showSeekbar}
+        style={styles.mediaContainer}
+      >
         {post.mediaType === "video" ? (
           <Video
             ref={videoRef}
             source={{ uri: post.mediaUrl as string }}
             style={styles.media}
             resizeMode={ResizeMode.CONTAIN}
-            shouldPlay={false} // Wordt via logica geregeld
+            shouldPlay={false}
             isLooping
-            useNativeControls
+            useNativeControls={false}
           />
         ) : (
           <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
         )}
-        {/* Geef hier een no-op mee voor onPress zodat PlayPause voldoet aan de types */}
-        <PlayPause isPlaying={isPlaying} onPress={() => {}} />
+        {/* PlayPause-knop */}
+        <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
+        {/* Seekbar-overlay: absoluut gepositioneerd onderin de media */}
+        <Animated.View
+          style={[styles.seekbarContainer, { opacity: sliderOpacity }]}
+          pointerEvents="box-none"
+          onStartShouldSetResponder={() => true}
+        >
+          <Slider
+            style={{ width: 330, height: 5 }}
+            minimumValue={0}
+            maximumValue={1}
+            value={duration ? currentTime / duration : 0}
+            minimumTrackTintColor="#FFFFFF"
+            maximumTrackTintColor="#000000"
+            thumbTintColor="#FFFFFF"
+            onSlidingComplete={async (value: number) => {
+              const newPosition = value * duration;
+              if (post.mediaType === "video" && videoRef.current) {
+                await videoRef.current.setPositionAsync(newPosition);
+              } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+                await audioRef.current.setPositionAsync(newPosition);
+                const status = await audioRef.current.getStatusAsync();
+                if (status.isLoaded && !status.isPlaying) {
+                  await audioRef.current.playAsync();
+                  setIsPlaying(true);
+                }
+              }
+            }}
+          />
+        </Animated.View>
       </Pressable>
 
       {/* Post Details */}
@@ -315,6 +385,21 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     resizeMode: "cover",
+  },
+  seekbarContainer: {
+    position: "absolute",
+    bottom: -5, // 10 pixels van de onderkant van de media
+    left: 10,
+    right: 10,
+    paddingHorizontal: 0,
+    paddingVertical: 2,
+    borderRadius: 5,
+    backgroundColor: "rgba(0, 0, 0, 0)",
+  },
+  slider: {
+    width: "100%",
+    height: 100,
+    
   },
   postDetails: {
     marginTop: 10,
