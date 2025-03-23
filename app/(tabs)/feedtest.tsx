@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { View, FlatList, StyleSheet, Text } from "react-native";
 import { Video, Audio } from "expo-av";
 import PostComponent from "../../components/postcomponent";
@@ -6,12 +6,35 @@ import { useArtistTags } from "../../hooks/useArtistTags";
 import { useGenreTags } from "../../hooks/useGenreTags";
 import { usePosts } from "../../hooks/useFeedPosts"; // ✅ Correcte import
 
+
+
+
+
+
+
 const FeedScreen: React.FC = () => {
   const { posts, loading, error } = usePosts(); // ✅ Gebruik de hook direct
   const videoRefs = useRef<{ [key: string]: Video | null }>({});
   const audioRefs = useRef<{ [key: string]: Audio.Sound | null }>({});
+  const [activePostId, setActivePostId] = useState<string | null>(null);
+  
+  
+    const viewabilityConfig = {
+      itemVisiblePercentThreshold: 80, // Als 80% van het item zichtbaar is, beschouwen we het als actief
+       };
 
-  // Haal de tags op
+  
+  
+    const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
+     if (viewableItems.length > 0) {
+      // Kies het eerste item als actief (je kunt de logica hier aanpassen indien nodig)
+      setActivePostId(viewableItems[0].item.id);
+     }
+       }).current;
+
+  
+  
+    // Haal de tags op
   const { artistTags, loading: artistLoading, error: artistError } = useArtistTags();
   const { genreTags, loading: genreLoading, error: genreError } = useGenreTags();
 
@@ -85,6 +108,7 @@ const FeedScreen: React.FC = () => {
                 genreTags: item.genreTags ?? [],
                 timestamp: item.timestamp.toString(), // ✅ Zorgt dat timestamp correct wordt weergegeven
               }}
+              isActive={activePostId === item.id} // Dit is de nieuwe prop
               onPlayPause={handlePlayPause}
               artistTags={artistTags}  
               genreTags={genreTags}    
@@ -101,6 +125,8 @@ const FeedScreen: React.FC = () => {
         })}
         snapToInterval={650}
         ListHeaderComponent={<View style={{ height: 125 }} />}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
       />
     </View>
   );

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,22 +9,16 @@ import {
   Animated,
 } from "react-native";
 import { Video, ResizeMode, Audio } from "expo-av";
-import Icon from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
-
 import { useAuth } from "../context/authContext";
 
-import ProfilePic from "./mainbuttons/profilepic";
-import Username from "./mainbuttons/username";
+import ProfileLink from "./profileLink";
+import Like from "./mainbuttons/like";
 import Follow from "./mainbuttons/follow";
 import PlayPause from "./mainbuttons/play_pause";
-import Like from "./mainbuttons/like";
 import Collab from "./mainbuttons/collab";
-import Bookmark from "./mainbuttons/bookmark";
 import ArtistTag from "./mainbuttons/tags/artist_tags";
 import GenreTag from "./mainbuttons/tags/genre_tags";
-
-import ProfileLink from "./profileLink";
 
 export interface ArtistTagData {
   id: string;
@@ -37,7 +31,7 @@ export interface GenreTagData {
   name: string;
 }
 
-interface PostData {
+export interface PostData {
   id: string;
   userId: string;
   profileImage: string;
@@ -62,38 +56,147 @@ interface PostProps {
   onPlayPause: (postId: string) => Promise<void>;
   artistTags: ArtistTagData[];
   genreTags: GenreTagData[];
+  isActive: boolean; // Geeft aan of de post via scroll automatisch moet afspelen
 }
 
-const DOUBLE_PRESS_DELAY = 300;
-
-
-
-const PostComponent: React.FC<PostProps> = ({ post, onPlayPause, artistTags, genreTags }) => {
-  const { user } = useAuth(); // user bevat bijvoorbeeld de ingelogde gebruiker
-  const currentUserId = user?.id; // haal het id op
+const PostComponent: React.FC<PostProps> = ({
+  post,
+  isActive,
+  onPlayPause,
+  artistTags,
+  genreTags,
+}) => {
+  const { user } = useAuth();
+  const currentUserId = user?.id;
   const [liked, setLiked] = useState(post.isLiked);
   const [followed, setFollowed] = useState(post.isFollowed);
   const [isPlaying, setIsPlaying] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  // Geeft aan of de gebruiker handmatig gepauzeerd heeft
+  const [manualPaused, setManualPaused] = useState(false);
 
-  const lastTap = useRef<number | null>(null);
-  const tapTimeout = useRef<NodeJS.Timeout | null>(null);
-  const heartScale = useRef(new Animated.Value(0)).current;
   const videoRef = useRef<Video | null>(null);
   const audioRef = useRef<Audio.Sound | null>(null);
+  const heartScale = useRef(new Animated.Value(0)).current;
 
-  const getArtistTagById = (id: string) => artistTags.find((tag) => tag.id === id);
-  const getGenreTagById = (id: string) => genreTags.find((tag) => tag.id === id);
-
+  // Handmatige play/pause functie (wanneer de gebruiker tikt)
   const handlePlayPause = async () => {
     if (post.mediaType === "video" && videoRef.current) {
-      isPlaying ? await videoRef.current.pauseAsync() : await videoRef.current.playAsync();
+      if (isPlaying) {
+        console.log(`Manually pausing video ${post.id}`);
+        await videoRef.current.pauseAsync();
+        setIsPlaying(false);
+        setManualPaused(true);
+      } else {
+        console.log(`Manually resuming video ${post.id} from current position`);
+        await videoRef.current.playAsync();
+        setIsPlaying(true);
+        setManualPaused(false);
+      }
+    } else if (post.mediaType === "photo" && post.audio) {
+      if (audioRef.current) {
+        if (isPlaying) {
+          console.log(`Manually pausing audio for post ${post.id}`);
+          try {
+            await audioRef.current.pauseAsync();
+          } catch (error) {
+            console.error("Error pausing audio:", error);
+          }
+          setIsPlaying(false);
+          setManualPaused(true);
+        } else {
+          console.log(`Manually resuming audio for post ${post.id} from current position`);
+          try {
+            await audioRef.current.playAsync();
+          } catch (error) {
+            console.error("Error resuming audio:", error);
+          }
+          setIsPlaying(true);
+          setManualPaused(false);
+        }
+      }
     }
-    setIsPlaying(!isPlaying);
-    onPlayPause(post.id);
+    // We roepen hier niet onPlayPause meer aan, zodat de lokale state niet overschreven wordt.
   };
- 
-  
+
+  // Helper: async wrapper om fouten te negeren
+  const awaitOrIgnore = async (fn: () => Promise<any>) => {
+    try {
+      await fn();
+    } catch (error) {
+      console.error("Ignored error:", error);
+    }
+  };
+
+  // useEffect voor automatische play/pause op basis van scroll (isActive)
+  // We checken nu ook of de media al speelt (isPlaying) voordat we de media resetten.
+  useEffect(() => {
+    if (isActive) {
+      // Alleen auto-play als er geen handmatige pauze is en de media nog niet speelt
+      if (!manualPaused && !isPlaying) {
+        if (post.mediaType === "video" && videoRef.current) {
+          console.log(`Auto-playing video ${post.id} from beginning`);
+          awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
+          awaitOrIgnore(() => videoRef.current!.playAsync());
+          setIsPlaying(true);
+        } else if (post.mediaType === "photo" && post.audio) {
+          const handleAudio = async () => {
+            if (audioRef.current) {
+              console.log(`Auto-restarting audio for post ${post.id} from beginning`);
+              try {
+                await audioRef.current.setPositionAsync(0);
+                await audioRef.current.playAsync();
+                setIsPlaying(true);
+              } catch (error) {
+                console.error("Error restarting audio:", error);
+              }
+            } else {
+              console.log(`Auto-loading and playing audio for post ${post.id} from beginning`);
+              try {
+                const audioUri =
+                  typeof post.audio === "string" ? post.audio : post.audio!.toString();
+                const { sound } = await Audio.Sound.createAsync(
+                  { uri: audioUri },
+                  { shouldPlay: true }
+                );
+                audioRef.current = sound;
+                setIsPlaying(true);
+                sound.setOnPlaybackStatusUpdate((status) => {
+                  console.log(`Playback status for post ${post.id}:`, status);
+                });
+              } catch (error) {
+                console.error("Error auto-loading audio:", error);
+              }
+            }
+          };
+          handleAudio();
+        }
+      }
+    } else {
+      // Post is niet actief: pauzeer en reset de media, en reset de handmatige pauze
+      if (post.mediaType === "video" && videoRef.current) {
+        console.log(`Auto-pausing video ${post.id}`);
+        awaitOrIgnore(() => videoRef.current!.pauseAsync());
+        awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
+        setIsPlaying(false);
+      } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+        console.log(`Auto-stopping and unloading audio for post ${post.id}`);
+        awaitOrIgnore(() => audioRef.current!.stopAsync());
+        awaitOrIgnore(() => audioRef.current!.unloadAsync());
+        audioRef.current = null;
+        setIsPlaying(false);
+      }
+      setManualPaused(false);
+    }
+  }, [isActive, manualPaused, isPlaying, post.mediaType, post.audio, post.id]);
+
+  // Als de post inactief wordt, reset de handmatige override zodat bij terugkomen auto-play mogelijk is
+  useEffect(() => {
+    if (!isActive && manualPaused) {
+      setManualPaused(false);
+    }
+  }, [isActive]);
+
   return (
     <View style={styles.postContainer}>
       {/* Post Header */}
@@ -101,8 +204,9 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause, artistTags, gen
         <View style={styles.profileContainer}>
           <ProfileLink userId={post.userId}>
             <Image 
-            source={{ uri: post.profileImage }} 
-            style={{ width: 30, height: 30, borderRadius: 15 }} /> 
+              source={{ uri: post.profileImage }} 
+              style={{ width: 30, height: 30, borderRadius: 15 }} 
+            />
           </ProfileLink>
           <ProfileLink userId={post.userId}>
             <Text style={styles.usernameText}>{post.username}</Text>
@@ -122,14 +226,15 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause, artistTags, gen
             source={{ uri: post.mediaUrl as string }}
             style={styles.media}
             resizeMode={ResizeMode.CONTAIN}
-            shouldPlay={false}
+            shouldPlay={false} // Wordt via logica geregeld
             isLooping
             useNativeControls
           />
         ) : (
           <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
         )}
-        <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
+        {/* Geef hier een no-op mee voor onPress zodat PlayPause voldoet aan de types */}
+        <PlayPause isPlaying={isPlaying} onPress={() => {}} />
       </Pressable>
 
       {/* Post Details */}
@@ -139,35 +244,35 @@ const PostComponent: React.FC<PostProps> = ({ post, onPlayPause, artistTags, gen
           {post.description}
         </Text>
         <TouchableOpacity onPress={() => setDescriptionExpanded(!descriptionExpanded)}>
-          <Text style={styles.seeMoreText}>{descriptionExpanded ? "See less" : "See more"}</Text>
+          <Text style={styles.seeMoreText}>
+            {descriptionExpanded ? "See less" : "See more"}
+          </Text>
         </TouchableOpacity>
       </View>
 
       {/* Tags */}
       <View style={styles.tagsContainer}>
         {post.artistTags?.map((tagId, index) => {
-          const foundTag = getArtistTagById(tagId);
-          return foundTag ? <ArtistTag key={index} id={foundTag.id} name={foundTag.name} image={foundTag.image} /> : null;
+          const foundTag = artistTags.find((tag) => tag.id === tagId);
+          return foundTag ? (
+            <ArtistTag key={index} id={foundTag.id} name={foundTag.name} image={foundTag.image} />
+          ) : null;
         })}
         {post.genreTags?.map((tagId, index) => {
-          const foundTag = getGenreTagById(tagId);
+          const foundTag = genreTags.find((tag) => tag.id === tagId);
           return foundTag ? <GenreTag key={index} id={foundTag.id} name={foundTag.name} /> : null;
         })}
       </View>
 
       {/* Collab Button */}
       <View style={styles.postActions}>
-      { currentUserId ? (
-  <Collab 
-    senderId={currentUserId} 
-    receiverId={post.userId} 
-    postId={post.id} 
-  />
-) : (
-  <TouchableOpacity style={styles.collabButtonDisabled} disabled={true}>
-    <Text style={styles.collabText}>LOGIN TO COLLAB!</Text>
-  </TouchableOpacity>
-)}
+        {currentUserId ? (
+          <Collab senderId={currentUserId} receiverId={post.userId} postId={post.id} />
+        ) : (
+          <TouchableOpacity style={styles.collabButtonDisabled} disabled={true}>
+            <Text style={styles.collabText}>LOGIN TO COLLAB!</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -193,21 +298,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
-  },
   usernameText: {
     color: "white",
     fontSize: 12,
     fontWeight: "bold",
-    marginLeft: 5
+    marginLeft: 5,
   },
   mediaContainer: {
     width: "100%",
-    aspectRatio: 1, // ✅ Zorgt ervoor dat de hoogte altijd gelijk is aan de breedte (vierkant)
+    aspectRatio: 1,
     borderRadius: 10,
     overflow: "hidden",
     backgroundColor: "#000",
@@ -246,13 +345,12 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     marginTop: 10,
   },
-  headerButtons: {  // ✅ Dit was eerder niet gedefinieerd
+  headerButtons: {
     flexDirection: "row",
     alignItems: "center",
   },
   collabButtonDisabled: {},
-  collabText: {}
-  
+  collabText: {},
 });
 
 export default PostComponent;
