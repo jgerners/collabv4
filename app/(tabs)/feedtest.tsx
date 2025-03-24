@@ -1,44 +1,49 @@
 import React, { useRef, useState } from "react";
-import { View, FlatList, StyleSheet, Text } from "react-native";
+import {
+  View,
+  FlatList,
+  StyleSheet,
+  Text,
+  Dimensions,
+  RefreshControl,
+  ActivityIndicator,
+} from "react-native";
 import { Video, Audio } from "expo-av";
 import PostComponent from "../../components/postcomponent";
 import { useArtistTags } from "../../hooks/useArtistTags";
 import { useGenreTags } from "../../hooks/useGenreTags";
-import { usePosts } from "../../hooks/useFeedPosts"; // ✅ Correcte import
+import { usePosts } from "../../hooks/useFeedPosts";
 
-
-
-
-
-
+// Bereken de schaalfactor op basis van een basisbreedte van 370
+const { width: windowWidth } = Dimensions.get("window");
+const scale = windowWidth / 370;
+// De originele postbubble is 630 hoog met een marginBottom van 20 (totaal 650)
+const itemLength = scale * 600;
 
 const FeedScreen: React.FC = () => {
-  const { posts, loading, error } = usePosts(); // ✅ Gebruik de hook direct
+  // Voeg hier eventueel de refetch functie toe
+  const { posts, loading, error, refetch } = usePosts();
   const videoRefs = useRef<{ [key: string]: Video | null }>({});
   const audioRefs = useRef<{ [key: string]: Audio.Sound | null }>({});
   const [activePostId, setActivePostId] = useState<string | null>(null);
-  
-  
-    const viewabilityConfig = {
-      itemVisiblePercentThreshold: 80, // Als 80% van het item zichtbaar is, beschouwen we het als actief
-       };
+  const [refreshing, setRefreshing] = useState(false);
 
-  
-  
-    const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
-     if (viewableItems.length > 0) {
-      // Kies het eerste item als actief (je kunt de logica hier aanpassen indien nodig)
-      setActivePostId(viewableItems[0].item.id);
-     }
-       }).current;
+  const viewabilityConfig = {
+    itemVisiblePercentThreshold: 80, // Als 80% van het item zichtbaar is, beschouwen we het als actief
+  };
 
-  
-  
-    // Haal de tags op
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: any[] }) => {
+      if (viewableItems.length > 0) {
+        // Kies het eerste item als actief (pas logica aan indien nodig)
+        setActivePostId(viewableItems[0].item.id);
+      }
+    }
+  ).current;
+
+  // Haal de tags op
   const { artistTags, loading: artistLoading, error: artistError } = useArtistTags();
   const { genreTags, loading: genreLoading, error: genreError } = useGenreTags();
-
-  
 
   const handlePlayPause = async (postId: string) => {
     const updatedPosts = posts.map((post) => {
@@ -70,14 +75,18 @@ const FeedScreen: React.FC = () => {
       }
       return post;
     });
+  };
 
-    
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch(); // Zorg dat de hook usePosts een refetch functie teruggeeft
+    setRefreshing(false);
   };
 
   if (loading || artistLoading || genreLoading) {
     return (
-      <View style={styles.container}>
-        <Text style={{ color: "white" }}>Loading posts...</Text>
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="white" />
       </View>
     );
   }
@@ -85,30 +94,31 @@ const FeedScreen: React.FC = () => {
   if (error || artistError || genreError) {
     return (
       <View style={styles.container}>
-        <Text style={{ color: "red" }}>❌ Fout bij laden van posts: {error || artistError || genreError}</Text>
+        <Text style={{ color: "red" }}>
+          ❌ Fout bij laden van posts: {error || artistError || genreError}
+        </Text>
       </View>
     );
   }
-  
+
   return (
     <View style={styles.container}>
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => {
-          
           return (
             <PostComponent 
               post={{
                 ...item,
-                userId: item.userId, // ✅ Fix: Zorg ervoor dat userId niet verdwijnt!
-                username: item.username || "Onbekend",  // ✅ Haalt de username correct uit 'profiles'
-                profileImage: item.profileImage || "https://via.placeholder.com/50",  // ✅ Profielfoto correct uit 'profiles'
+                userId: item.userId,
+                username: item.username || "Onbekend",
+                profileImage: item.profileImage || "https://via.placeholder.com/50",
                 artistTags: item.artistTags ?? [],
                 genreTags: item.genreTags ?? [],
-                timestamp: item.timestamp.toString(), // ✅ Zorgt dat timestamp correct wordt weergegeven
+                timestamp: item.timestamp.toString(),
               }}
-              isActive={activePostId === item.id} // Dit is de nieuwe prop
+              isActive={activePostId === item.id}
               onPlayPause={handlePlayPause}
               artistTags={artistTags}  
               genreTags={genreTags}    
@@ -119,14 +129,17 @@ const FeedScreen: React.FC = () => {
         snapToAlignment="start"
         showsVerticalScrollIndicator={false}
         getItemLayout={(data, index) => ({
-          length: 630,
-          offset: 630 * index,
+          length: itemLength,
+          offset: itemLength * index,
           index,
         })}
-        snapToInterval={650}
-        ListHeaderComponent={<View style={{ height: 125 }} />}
+        snapToInterval={itemLength}
+        ListHeaderComponent={<View style={{ height: scale * 125 }} />}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       />
     </View>
   );
@@ -135,7 +148,18 @@ const FeedScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "rgb(25, 25, 25)",
+    backgroundColor: "#121212",
+    
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: scale * 350,
+    position: "absolute",
+    zIndex: 9999, // Zorgt dat de overlay boven andere content komt
   },
 });
 

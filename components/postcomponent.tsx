@@ -7,6 +7,10 @@ import {
   Pressable,
   StyleSheet,
   Animated,
+  Dimensions,
+  UIManager,
+  Platform,
+  LayoutAnimation,
 } from "react-native";
 import { Video, ResizeMode, Audio } from "expo-av";
 import { useNavigation } from "@react-navigation/native";
@@ -20,6 +24,15 @@ import PlayPause from "./mainbuttons/play_pause";
 import Collab from "./mainbuttons/collab";
 import ArtistTag from "./mainbuttons/tags/artist_tags";
 import GenreTag from "./mainbuttons/tags/genre_tags";
+
+// Activeer LayoutAnimation op Android
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+// Bereken de schaalfactor op basis van een basisbreedte van 370
+const { width: windowWidth } = Dimensions.get("window");
+const scale = windowWidth / 370;
 
 export interface ArtistTagData {
   id: string;
@@ -76,6 +89,9 @@ const PostComponent: React.FC<PostProps> = ({
   // Geeft aan of de gebruiker handmatig gepauzeerd heeft
   const [manualPaused, setManualPaused] = useState(false);
 
+  // Bepaalt of de beschrijving meer dan 2 regels heeft
+  const [showSeeMore, setShowSeeMore] = useState(false);
+
   const videoRef = useRef<Video | null>(null);
   const audioRef = useRef<Audio.Sound | null>(null);
   const heartScale = useRef(new Animated.Value(0)).current;
@@ -126,7 +142,6 @@ const PostComponent: React.FC<PostProps> = ({
         }
       }
     }
-    // We roepen hier niet onPlayPause meer aan, zodat de lokale state niet overschreven wordt.
   };
 
   // Helper: async wrapper om fouten te negeren
@@ -153,8 +168,6 @@ const PostComponent: React.FC<PostProps> = ({
       duration: 200,
       useNativeDriver: true,
     }).start();
-
-    // Verberg de seekbar na 3 seconden
     setTimeout(() => {
       Animated.timing(sliderOpacity, {
         toValue: 0,
@@ -169,10 +182,15 @@ const PostComponent: React.FC<PostProps> = ({
     showSeekbar();
   };
 
+  // Open de beschrijving en laat de container uitbreiden via LayoutAnimation
+  const toggleDescription = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setDescriptionExpanded(!descriptionExpanded);
+  };
+
   // useEffect voor automatische play/pause op basis van scroll (isActive)
   useEffect(() => {
     if (isActive) {
-      // Alleen auto-play als er geen handmatige pauze is en de media nog niet speelt
       if (!manualPaused && !isPlaying) {
         if (post.mediaType === "video" && videoRef.current) {
           console.log(`Auto-playing video ${post.id} from beginning`);
@@ -180,7 +198,6 @@ const PostComponent: React.FC<PostProps> = ({
           awaitOrIgnore(() => videoRef.current!.playAsync());
           setIsPlaying(true);
         } else if (post.mediaType === "photo" && post.audio) {
-          // Voor foto-posts: laad audio alleen als deze nog niet bestaat
           if (!audioRef.current) {
             const handleAudio = async () => {
               console.log(`Auto-loading and playing audio for post ${post.id} from beginning`);
@@ -192,7 +209,6 @@ const PostComponent: React.FC<PostProps> = ({
                 );
                 audioRef.current = sound;
                 setIsPlaying(true);
-                // Gebruik updatePlaybackStatus zodat de slider ook werkt
                 sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
               } catch (error) {
                 console.error("Error auto-loading audio:", error);
@@ -203,7 +219,6 @@ const PostComponent: React.FC<PostProps> = ({
         }
       }
     } else {
-      // Post is niet actief: pauzeer en reset de media, en reset de handmatige pauze
       if (post.mediaType === "video" && videoRef.current) {
         console.log(`Auto-pausing video ${post.id}`);
         awaitOrIgnore(() => videoRef.current!.pauseAsync());
@@ -220,7 +235,6 @@ const PostComponent: React.FC<PostProps> = ({
     }
   }, [isActive, manualPaused, isPlaying, post.mediaType, post.audio, post.id]);
 
-  // Reset handmatige pauze als de post inactief wordt
   useEffect(() => {
     if (!isActive && manualPaused) {
       setManualPaused(false);
@@ -231,7 +245,6 @@ const PostComponent: React.FC<PostProps> = ({
     if (post.mediaType === "video" && videoRef.current) {
       videoRef.current.setOnPlaybackStatusUpdate(updatePlaybackStatus);
     }
-    // Voor foto-posts met audio wordt de status update ingesteld bij het laden van de audio
   }, [post.mediaType]);
 
   return (
@@ -242,7 +255,11 @@ const PostComponent: React.FC<PostProps> = ({
           <ProfileLink userId={post.userId}>
             <Image
               source={{ uri: post.profileImage }}
-              style={{ width: 30, height: 30, borderRadius: 15 }}
+              style={{
+                width: scale * 30,
+                height: scale * 30,
+                borderRadius: scale * 15,
+              }}
             />
           </ProfileLink>
           <ProfileLink userId={post.userId}>
@@ -266,7 +283,7 @@ const PostComponent: React.FC<PostProps> = ({
             ref={videoRef}
             source={{ uri: post.mediaUrl as string }}
             style={styles.media}
-            resizeMode={ResizeMode.CONTAIN}
+            resizeMode={ResizeMode.COVER}
             shouldPlay={false}
             isLooping
             useNativeControls={false}
@@ -274,22 +291,20 @@ const PostComponent: React.FC<PostProps> = ({
         ) : (
           <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
         )}
-        {/* PlayPause-knop */}
         <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
-        {/* Seekbar-overlay: absoluut gepositioneerd onderin de media */}
         <Animated.View
           style={[styles.seekbarContainer, { opacity: sliderOpacity }]}
           pointerEvents="box-none"
           onStartShouldSetResponder={() => true}
         >
           <Slider
-            style={{ width: 330, height: 5 }}
+            style={{ width: scale * 330, height: scale * 5 }}
             minimumValue={0}
             maximumValue={1}
             value={duration ? currentTime / duration : 0}
             minimumTrackTintColor="#FFFFFF"
             maximumTrackTintColor="#000000"
-            thumbTintColor="#FFFFFF"
+            thumbTintColor="#FFFFFF00"
             onSlidingComplete={async (value: number) => {
               const newPosition = value * duration;
               if (post.mediaType === "video" && videoRef.current) {
@@ -310,28 +325,55 @@ const PostComponent: React.FC<PostProps> = ({
       {/* Post Details */}
       <View style={styles.postDetails}>
         <Text style={styles.postTitle}>{post.title}</Text>
-        <Text style={styles.postDescription} numberOfLines={descriptionExpanded ? undefined : 2}>
+        <Text
+          style={styles.postDescription}
+          numberOfLines={descriptionExpanded ? undefined : 2}
+        >
           {post.description}
         </Text>
-        <TouchableOpacity onPress={() => setDescriptionExpanded(!descriptionExpanded)}>
-          <Text style={styles.seeMoreText}>
-            {descriptionExpanded ? "See less" : "See more"}
-          </Text>
-        </TouchableOpacity>
+        {/* Deze onzichtbare tekst meet het aantal regels van de volledige beschrijving */}
+        <Text
+          style={[
+            styles.postDescription,
+            { position: "absolute", opacity: 0, zIndex: -1 },
+          ]}
+          onTextLayout={(e) => {
+            if (e.nativeEvent.lines.length > 2 && !showSeeMore) {
+              setShowSeeMore(true);
+            }
+          }}
+        >
+          {post.description}
+        </Text>
+        {showSeeMore && (
+          <TouchableOpacity onPress={toggleDescription}>
+            <Text style={styles.seeMoreText}>
+              {descriptionExpanded ? "See less" : "See more"}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Tags */}
       <View style={styles.tagsContainer}>
-        {post.artistTags?.map((tagId, index) => {
-          const foundTag = artistTags.find((tag) => tag.id === tagId);
-          return foundTag ? (
-            <ArtistTag key={index} id={foundTag.id} name={foundTag.name} image={foundTag.image} />
-          ) : null;
-        })}
-        {post.genreTags?.map((tagId, index) => {
-          const foundTag = genreTags.find((tag) => tag.id === tagId);
-          return foundTag ? <GenreTag key={index} id={foundTag.id} name={foundTag.name} /> : null;
-        })}
+        <View style={styles.artistTagsContainer}>
+          {post.artistTags?.map((tagId, index) => {
+            const foundTag = artistTags.find((tag) => tag.id === tagId);
+            return foundTag ? (
+              <View key={foundTag.id} style={{ marginLeft: index === 0 ? 0 : -10 }}>
+                <ArtistTag id={foundTag.id} name={foundTag.name} image={foundTag.image} />
+              </View>
+            ) : null;
+          })}
+        </View>
+        <View style={styles.genreTagsContainer}>
+          {post.genreTags?.map((tagId, index) => {
+            const foundTag = genreTags.find((tag) => tag.id === tagId);
+            return foundTag ? (
+              <GenreTag key={foundTag.id} id={foundTag.id} name={foundTag.name} />
+            ) : null;
+          })}
+        </View>
       </View>
 
       {/* Collab Button */}
@@ -350,19 +392,19 @@ const PostComponent: React.FC<PostProps> = ({
 
 const styles = StyleSheet.create({
   postContainer: {
-    backgroundColor: "#222",
-    borderRadius: 20,
-    padding: 10,
-    marginBottom: 20,
-    height: 630,
-    width: 370,
+    backgroundColor: "#121212",
+    borderRadius: scale * 20,
+    padding: scale * 10,
+    marginBottom: scale * 20,
+    minHeight: scale * 580, // Gebruik minHeight zodat hij kan uitbreiden
+    width: scale * 350,
     alignSelf: "center",
   },
   postHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: scale * 10,
   },
   profileContainer: {
     flexDirection: "row",
@@ -370,14 +412,14 @@ const styles = StyleSheet.create({
   },
   usernameText: {
     color: "white",
-    fontSize: 12,
+    fontSize: scale * 12,
     fontWeight: "bold",
-    marginLeft: 5,
+    marginLeft: scale * 5,
   },
   mediaContainer: {
     width: "100%",
     aspectRatio: 1,
-    borderRadius: 10,
+    borderRadius: scale * 10,
     overflow: "hidden",
     backgroundColor: "#000",
   },
@@ -388,47 +430,62 @@ const styles = StyleSheet.create({
   },
   seekbarContainer: {
     position: "absolute",
-    bottom: -5, // 10 pixels van de onderkant van de media
-    left: 10,
-    right: 10,
+    bottom: scale * -15,
+    left: "50%",
+    transform: [{ translateX: -(scale * 330) / 2 }],
     paddingHorizontal: 0,
-    paddingVertical: 2,
-    borderRadius: 5,
+    paddingVertical: scale * 2,
+    borderRadius: scale * 5,
     backgroundColor: "rgba(0, 0, 0, 0)",
   },
   slider: {
     width: "100%",
-    height: 100,
-    
+    height: scale * 5,
   },
   postDetails: {
-    marginTop: 10,
-    paddingHorizontal: 10,
+    marginTop: scale * 10,
+    paddingHorizontal: scale * 10,
   },
   postTitle: {
     color: "white",
-    fontSize: 18,
+    fontSize: scale * 18,
     fontWeight: "bold",
+    right: scale * 10
   },
   postDescription: {
     color: "gray",
-    fontSize: 14,
-    marginBottom: 5,
+    fontSize: scale * 14,
+    marginBottom: scale * 5,
+    right: scale * 10
   },
   seeMoreText: {
     color: "white",
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: scale * 12,
+    marginTop: scale * 4,
+    right: scale * 10
   },
   tagsContainer: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 10,
+    alignItems: "center",
+    marginTop: scale * 10,
+    paddingHorizontal: scale * 10,
+    top: scale * 35,
+    right: scale * 10
+  },
+  artistTagsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  genreTagsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: scale * 20,
   },
   postActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginTop: 10,
+    marginTop: scale * 10,
+    left: scale * 10
   },
   headerButtons: {
     flexDirection: "row",
@@ -436,6 +493,7 @@ const styles = StyleSheet.create({
   },
   collabButtonDisabled: {},
   collabText: {},
+ 
 });
 
 export default PostComponent;

@@ -113,6 +113,8 @@ function AuthNavigator() {
     );
   }
 
+
+  
   return (
     <Stack.Navigator>
       {/* ✅ Als GEEN sessie → Toon Login/Register */}
@@ -190,7 +192,7 @@ const styles = StyleSheet.create({
   },
   headerBackground: {
     flex: 1,
-    backgroundColor: 'rgba(57, 57, 57, 0.81)',
+    backgroundColor: 'rgba(23, 23, 23, 0.81)',
   },
   loadingContainer: {
     flex: 1,

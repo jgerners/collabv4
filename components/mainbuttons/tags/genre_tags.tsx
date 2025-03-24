@@ -17,18 +17,24 @@ const GenreTag: React.FC<GenreTagProps> = ({ id, name }) => {
 
 const styles = StyleSheet.create({
     container: {
+     
         flexDirection: "row",
         alignItems: "center",
+        justifyContent: "center", // Centreert de inhoud verticaal
         marginRight: 8,
         backgroundColor: "#444",
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 20,
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+        borderRadius: 10,
         marginVertical: 4,
       },
       text: {
         fontSize: 12,
         color: "white",
+        textAlign: "center",
+        textAlignVertical: "center", // Voeg dit toe
+        lineHeight: 20, // lineHeight gelijk aan de containerhoogte
+
       },
 });
 
