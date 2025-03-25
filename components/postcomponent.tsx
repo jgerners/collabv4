@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Pressable,
   StyleSheet,
-  Animated,
   Dimensions,
   UIManager,
   Platform,
@@ -94,12 +93,7 @@ const PostComponent: React.FC<PostProps> = ({
 
   const videoRef = useRef<Video | null>(null);
   const audioRef = useRef<Audio.Sound | null>(null);
-  const heartScale = useRef(new Animated.Value(0)).current;
 
-  // Deze state bepaalt of de seekbar zichtbaar is
-  const [showSlider, setShowSlider] = useState(false);
-  // Een Animated.Value voor de opacity van de seekbar
-  const sliderOpacity = useRef(new Animated.Value(0)).current;
   // Houdt de totale duur van de media bij
   const [duration, setDuration] = useState(0);
   // Houdt de huidige positie (in millis) bij
@@ -160,27 +154,8 @@ const PostComponent: React.FC<PostProps> = ({
     }
   };
 
-  // Functie om de seekbar te tonen
-  const showSeekbar = () => {
-    setShowSlider(true);
-    Animated.timing(sliderOpacity, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-    setTimeout(() => {
-      Animated.timing(sliderOpacity, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }).start(() => setShowSlider(false));
-    }, 3000);
-  };
-
-  // Gebruik een long press om de seekbar te tonen
-  const handleMediaPress = () => {
-    showSeekbar();
-  };
+  // We halen de oude logica voor het animeren van de seekbar eruit
+  // Dus de seekbar is nu altijd zichtbaar
 
   // Open de beschrijving en laat de container uitbreiden via LayoutAnimation
   const toggleDescription = () => {
@@ -272,10 +247,9 @@ const PostComponent: React.FC<PostProps> = ({
         </View>
       </View>
 
-      {/* Media */}
+      {/* Media (vertical, portretverhouding 13:16) */}
       <Pressable
         onPress={handlePlayPause}
-        onLongPress={showSeekbar}
         style={styles.mediaContainer}
       >
         {post.mediaType === "video" ? (
@@ -291,68 +265,73 @@ const PostComponent: React.FC<PostProps> = ({
         ) : (
           <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
         )}
-        <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
-        <Animated.View
-          style={[styles.seekbarContainer, { opacity: sliderOpacity }]}
-          pointerEvents="box-none"
-          onStartShouldSetResponder={() => true}
-        >
-          <Slider
-            style={{ width: scale * 330, height: scale * 5 }}
-            minimumValue={0}
-            maximumValue={1}
-            value={duration ? currentTime / duration : 0}
-            minimumTrackTintColor="#FFFFFF"
-            maximumTrackTintColor="#000000"
-            thumbTintColor="#FFFFFF00"
-            onSlidingComplete={async (value: number) => {
-              const newPosition = value * duration;
-              if (post.mediaType === "video" && videoRef.current) {
-                await videoRef.current.setPositionAsync(newPosition);
-              } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
-                await audioRef.current.setPositionAsync(newPosition);
-                const status = await audioRef.current.getStatusAsync();
-                if (status.isLoaded && !status.isPlaying) {
-                  await audioRef.current.playAsync();
-                  setIsPlaying(true);
+
+        {/* Nieuwe Controls Container, die nu altijd zichtbaar is */}
+        <View style={styles.controlsContainer}>
+          {/* Play/Pause knop */}
+          <View style={styles.playButtonContainer}>
+            <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
+          </View>
+          {/* Seekbar */}
+          <View style={styles.seekbarContainer}>
+            <Slider
+              style={{ width: scale * 200, height: scale * 20 }}
+              minimumValue={0}
+              maximumValue={1}
+              value={duration ? currentTime / duration : 0}
+              minimumTrackTintColor="#FFFFFF"
+              maximumTrackTintColor="#000000"
+              thumbTintColor="#FFFFFF00"
+              onSlidingComplete={async (value: number) => {
+                const newPosition = value * duration;
+                if (post.mediaType === "video" && videoRef.current) {
+                  await videoRef.current.setPositionAsync(newPosition);
+                } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+                  await audioRef.current.setPositionAsync(newPosition);
+                  const status = await audioRef.current.getStatusAsync();
+                  if (status.isLoaded && !status.isPlaying) {
+                    await audioRef.current.playAsync();
+                    setIsPlaying(true);
+                  }
                 }
+              }}
+            />
+          </View>
+          {/* Placeholder voor replay/save knop */}
+          <View style={styles.placeholder}>
+            {/* Later toevoegen */}
+          </View>
+        </View>
+
+        {/* Titel & Beschrijving overlay in de media */}
+        <View style={styles.infoOverlay}>
+          <Text style={styles.postTitle}>{post.title}</Text>
+          <Text
+            style={[styles.postDescription, { marginBottom: descriptionExpanded ? 10 : 0 }]}
+            numberOfLines={descriptionExpanded ? undefined : 2}
+          >
+            {post.description}
+          </Text>
+          {/* Onzichtbare tekst voor meting aantal regels */}
+          <Text
+            style={[styles.postDescription, styles.hiddenText]}
+            onTextLayout={(e) => {
+              if (e.nativeEvent.lines.length > 2 && !showSeeMore) {
+                setShowSeeMore(true);
               }
             }}
-          />
-        </Animated.View>
+          >
+            {post.description}
+          </Text>
+          {showSeeMore && (
+            <TouchableOpacity onPress={toggleDescription}>
+              <Text style={styles.seeMoreText}>
+                {descriptionExpanded ? "See less" : "See more"}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </Pressable>
-
-      {/* Post Details */}
-      <View style={styles.postDetails}>
-        <Text style={styles.postTitle}>{post.title}</Text>
-        <Text
-          style={styles.postDescription}
-          numberOfLines={descriptionExpanded ? undefined : 2}
-        >
-          {post.description}
-        </Text>
-        {/* Deze onzichtbare tekst meet het aantal regels van de volledige beschrijving */}
-        <Text
-          style={[
-            styles.postDescription,
-            { position: "absolute", opacity: 0, zIndex: -1 },
-          ]}
-          onTextLayout={(e) => {
-            if (e.nativeEvent.lines.length > 2 && !showSeeMore) {
-              setShowSeeMore(true);
-            }
-          }}
-        >
-          {post.description}
-        </Text>
-        {showSeeMore && (
-          <TouchableOpacity onPress={toggleDescription}>
-            <Text style={styles.seeMoreText}>
-              {descriptionExpanded ? "See less" : "See more"}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
 
       {/* Tags */}
       <View style={styles.tagsContainer}>
@@ -396,8 +375,8 @@ const styles = StyleSheet.create({
     borderRadius: scale * 20,
     padding: scale * 10,
     marginBottom: scale * 20,
-    minHeight: scale * 580, // Gebruik minHeight zodat hij kan uitbreiden
-    width: scale * 350,
+    minHeight: scale * 580,
+    width: scale * 365,
     alignSelf: "center",
   },
   postHeader: {
@@ -416,61 +395,86 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginLeft: scale * 5,
   },
+  headerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  // Media container met portretverhouding (13:16) en gecentreerd
   mediaContainer: {
-    width: "100%",
-    aspectRatio: 1,
+    width: scale * 345, // aangepast naar een vaste, kleinere breedte
+  
     borderRadius: scale * 10,
     overflow: "hidden",
     backgroundColor: "#000",
+    marginBottom: scale * 10,
+    height: scale * 450,
+    alignSelf: "center",
   },
   media: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
+  },
+  // Nieuwe Controls Container
+  controlsContainer: {
+    position: "absolute",
+    bottom: scale * 2,
+    left: scale * 10,
+    right: scale * 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  playButtonContainer: {
+    width: scale * 30,  // Aangepaste kleinere grootte
+    height: scale * 30, // Aangepaste kleinere grootte
+    justifyContent: "center",
+    alignItems: "center",
+    bottom: scale * 10,
+    right: 8
   },
   seekbarContainer: {
+    width: scale * 200,
+  },
+  placeholder: {
+    width: scale * 40,
+    height: scale * 40,
+  },
+  // Overlay voor titel en beschrijving in de media
+  infoOverlay: {
     position: "absolute",
-    bottom: scale * -15,
-    left: "50%",
-    transform: [{ translateX: -(scale * 330) / 2 }],
-    paddingHorizontal: 0,
-    paddingVertical: scale * 2,
+    bottom: scale * 45, // net boven de controls
+    left: scale * 10,
+    right: scale * 10,
+    backgroundColor: "rgba(0,0,0,0.0)",
     borderRadius: scale * 5,
-    backgroundColor: "rgba(0, 0, 0, 0)",
-  },
-  slider: {
-    width: "100%",
-    height: scale * 5,
-  },
-  postDetails: {
-    marginTop: scale * 10,
-    paddingHorizontal: scale * 10,
+    padding: scale * 10,
   },
   postTitle: {
     color: "white",
-    fontSize: scale * 18,
+    fontSize: scale * 16,
     fontWeight: "bold",
-    right: scale * 10
+    marginBottom: scale * 5,
   },
   postDescription: {
-    color: "gray",
+    color: "white",
     fontSize: scale * 14,
-    marginBottom: scale * 5,
-    right: scale * 10
+  },
+  hiddenText: {
+    position: "absolute",
+    opacity: 0,
+    zIndex: -1,
   },
   seeMoreText: {
-    color: "white",
+    color: "#fff",
     fontSize: scale * 12,
     marginTop: scale * 4,
-    right: scale * 10
+    textDecorationLine: "underline",
   },
   tagsContainer: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: scale * 10,
     paddingHorizontal: scale * 10,
-    top: scale * 35,
-    right: scale * 10
   },
   artistTagsContainer: {
     flexDirection: "row",
@@ -484,16 +488,10 @@ const styles = StyleSheet.create({
   postActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginTop: scale * 10,
-    left: scale * 10
-  },
-  headerButtons: {
-    flexDirection: "row",
-    alignItems: "center",
+    marginTop: scale * -28,
   },
   collabButtonDisabled: {},
   collabText: {},
- 
 });
 
 export default PostComponent;

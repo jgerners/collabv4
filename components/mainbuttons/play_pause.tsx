@@ -13,7 +13,7 @@ const PlayPause: React.FC<PlayPauseProps> = ({ isPlaying, onPress }) => {
     <TouchableOpacity style={styles.playButton} onPress={onPress}>
       <Icon
         name={isPlaying ? "pause" : "play-outline"}
-        size={30}
+        size={22}
         color="white"
       />
     </TouchableOpacity>

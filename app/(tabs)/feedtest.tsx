@@ -83,6 +83,8 @@ const FeedScreen: React.FC = () => {
     setRefreshing(false);
   };
 
+  
+
   if (loading || artistLoading || genreLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
@@ -149,7 +151,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#121212",
-    
+
   },
   loadingContainer: {
     justifyContent: "center",
