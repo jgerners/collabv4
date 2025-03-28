@@ -21,6 +21,8 @@ import ArtistTagSelectScreen from "./screens/artistTagSelect";
 import GenreTagSelectScreen from "./screens/genreTagSelect";
 import LoginScreen from "./auth/login"; // ✅ Login
 import RegisterScreen from "./auth/register"; // ✅ Register
+import uploadProfileMediaScreen from "./screens/uploadProfileMediaScreen"; // ✅ Register
+import demoDetailScreen from './screens/demoDetailScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -151,9 +153,19 @@ function AuthNavigator() {
           <Stack.Screen 
             name="EditProfile" 
             component={EditProfile} 
-            options={{ headerShown: false }} 
-/>
+            options={{ headerShown: false }} />
 
+          <Stack.Screen 
+            name="uploadProfileMedia" 
+            component={uploadProfileMediaScreen} 
+            options={{ headerShown: false }} 
+          /> 
+
+          <Stack.Screen 
+           name="DemoDetail" 
+           component={demoDetailScreen} 
+           options={{ headerShown: true, headerTitle: "Demo Detail" }} 
+           />
           <Stack.Screen 
             name="ArtistTagSelect" 
             component={ArtistTagSelectScreen} 

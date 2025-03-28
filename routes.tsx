@@ -18,6 +18,10 @@ export type RootStackParamList = {
     Login: undefined; 
     Register: undefined; 
 
+    uploadProfileMedia: undefined;
+
+    DemoDetail: { demoId: string }; // Voeg dit toe
+
    
     
   };

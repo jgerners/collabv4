@@ -9,19 +9,24 @@ import {
   Dimensions,
   ScrollView,
   Button,
+  Alert,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { supabase } from "../../supabaseClient";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../context/authContext"; // ✅ AuthContext importeren
+import { generateVideoThumbnail } from "../../helpers/videoThumbnailHelper";
 
-// Nieuwe helper functie om een pre-signed URL op te halen
-// Nieuwe helper functie om een pre-signed URL op te halen
-const getPresignedUrl = async (uniqueName: string, contentType: string): Promise<string | null> => {
+const getPresignedUrl = async (
+  uniqueName: string,
+  contentType: string
+): Promise<string | null> => {
   try {
     const response = await fetch(
-      `http://192.168.178.31:3000/get-presigned-url?fileName=${encodeURIComponent(uniqueName)}&contentType=${encodeURIComponent(contentType)}`
+      `http://192.168.178.171:3000/get-presigned-url?fileName=${encodeURIComponent(
+        uniqueName
+      )}&contentType=${encodeURIComponent(contentType)}`
     );
     const json = await response.json();
     return json.url;
@@ -31,32 +36,24 @@ const getPresignedUrl = async (uniqueName: string, contentType: string): Promise
   }
 };
 
-// Nieuwe helper functie om het bestand naar AWS S3 te uploaden via de pre-signed URL
-const uploadFileToS3 = async (fileUri: string, folder: string): Promise<string | null> => {
+const uploadFileToS3 = async (
+  fileUri: string,
+  folder: string
+): Promise<string | null> => {
   try {
     console.log("uploadFileToS3 gestart voor:", fileUri, "in folder:", folder);
-
-    // Haal het bestand op als blob
     const response = await fetch(fileUri);
     const blob = await response.blob();
     console.log("Blob verkregen, size:", blob.size);
-
-    // Genereer een unieke bestandsnaam
     const fileName = fileUri.split("/").pop();
     const uniqueName = `${folder}/${Date.now()}_${fileName}`;
     console.log("UniqueName gegenereerd:", uniqueName);
-
-    // Bepaal het content-type; gebruik blob.type of een fallback
     const contentType = blob.type || "application/octet-stream";
-
-    // Verkrijg de pre-signed URL van je backend
     const presignedUrl = await getPresignedUrl(uniqueName, contentType);
     if (!presignedUrl) {
       throw new Error("Geen pre-signed URL ontvangen");
     }
     console.log("Presigned URL ontvangen:", presignedUrl);
-
-    // Upload het bestand naar S3 via een PUT-request
     const uploadResponse = await fetch(presignedUrl, {
       method: "PUT",
       headers: {
@@ -64,12 +61,10 @@ const uploadFileToS3 = async (fileUri: string, folder: string): Promise<string |
       },
       body: blob,
     });
-
     if (!uploadResponse.ok) {
       console.error("Upload naar S3 mislukt:", uploadResponse.statusText);
       return null;
     }
-
     // Stel de publieke URL samen (pas dit aan met jouw bucketnaam)
     const publicUrl = `https://collabpostmedia.s3.amazonaws.com/${uniqueName}`;
     console.log("Publieke URL verkregen:", publicUrl);
@@ -79,8 +74,6 @@ const uploadFileToS3 = async (fileUri: string, folder: string): Promise<string |
     return null;
   }
 };
-
-
 
 const UploadScreen: React.FC = () => {
   const { user } = useAuth(); // ✅ Haal de ingelogde gebruiker op
@@ -124,25 +117,24 @@ const UploadScreen: React.FC = () => {
   };
 
   const handleUpload = async () => {
-   
-    
     if (!user) {
       setError("Je moet ingelogd zijn om een post te plaatsen.");
-      
       return;
     }
-    
+
     setUploading(true);
     setError(null);
-    
+
     let mediaPublicUrl = "";
     let audioPublicUrl = "";
-    
+    // Gebruik een lokale variabele voor de video thumbnail URL
+    let videoThumbnailUrl = "";
+
     if (selectedMedia) {
       console.log("Geselecteerde media URI:", selectedMedia);
       const folder = uploadType === "video" ? "videos" : "images";
       const url = await uploadFileToS3(selectedMedia, folder);
-      console.log("Media URL van uploadFileToBucket:", url);
+      console.log("Media URL van uploadFileToS3:", url);
       if (url) {
         mediaPublicUrl = url;
       } else {
@@ -150,12 +142,32 @@ const UploadScreen: React.FC = () => {
         setUploading(false);
         return;
       }
+
+      // Als het een video betreft, genereer en upload de thumbnail
+      if (uploadType === "video") {
+        const thumbnailLocalUri = await generateVideoThumbnail(selectedMedia);
+        if (thumbnailLocalUri) {
+          const thumbnailUrl = await uploadFileToS3(thumbnailLocalUri, "video_thumbnails");
+          if (thumbnailUrl) {
+            videoThumbnailUrl = thumbnailUrl;
+            console.log("Video thumbnail URL:", videoThumbnailUrl);
+          } else {
+            setError("Fout bij uploaden van video thumbnail.");
+            setUploading(false);
+            return;
+          }
+        } else {
+          setError("Fout bij genereren van video thumbnail.");
+          setUploading(false);
+          return;
+        }
+      }
     }
-    
+
     if (selectedAudio) {
       console.log("Geselecteerde audio URI:", selectedAudio);
       const url = await uploadFileToS3(selectedAudio, "audio");
-      console.log("Audio URL van uploadFileToBucket:", url);
+      console.log("Audio URL van uploadFileToS3:", url);
       if (url) {
         audioPublicUrl = url;
       } else {
@@ -164,14 +176,16 @@ const UploadScreen: React.FC = () => {
         return;
       }
     }
-    
+
     console.log("mediaPublicUrl:", mediaPublicUrl);
     console.log("audioPublicUrl:", audioPublicUrl);
-    
+    console.log("videoThumbnailUrl:", videoThumbnailUrl);
+
     const newPost = {
       userId: user?.id,
       media: mediaPublicUrl,
       mediaUrl: mediaPublicUrl,
+      video_thumbnail: videoThumbnailUrl, // Gebruik de lokale variabele
       mediaType: uploadType,
       audioUrl: audioPublicUrl,
       title,
@@ -184,9 +198,9 @@ const UploadScreen: React.FC = () => {
       isSaved: false,
       isPlaying: false,
     };
-    
+
     console.log("Nieuwe post object:", newPost);
-    
+
     try {
       const { error: supabaseError } = await supabase
         .from("posts")
@@ -203,12 +217,13 @@ const UploadScreen: React.FC = () => {
         setSelectedAudio(null);
         setSelectedArtistTags([]);
         setSelectedGenreTags([]);
+        videoThumbnailUrl = ""; // reset de lokale variabele
       }
     } catch (err) {
       console.error("Fout bij post-insert:", err);
       setError("Er is iets misgegaan bij het opslaan van de post.");
     }
-    
+
     setUploading(false);
     console.log("handleUpload beëindigd");
   };
@@ -218,7 +233,6 @@ const UploadScreen: React.FC = () => {
     setUploadType(tabOrder[newIndex]);
   };
 
-  // Navigatieknoppen met callback doorgeven
   const goToArtistTagSelect = () => {
     navigation.navigate("ArtistTagSelect", {
       onSave: (tags: string[]) => setSelectedArtistTags(tags),

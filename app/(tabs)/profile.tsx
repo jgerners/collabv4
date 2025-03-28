@@ -1,16 +1,46 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
-import { useAuth } from "../../context/authContext"; // ✅ User ophalen
-import ProfilePic from "../../components/mainbuttons/profilepic"; // ✅ Gebruik je component
-import Username from "../../components/mainbuttons/username"; // ✅ Gebruik je component
+// ProfileScreen.tsx
+import React, { useState, useEffect } from "react";
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Image, 
+  ActivityIndicator 
+} from "react-native";
+import { useAuth } from "../../context/authContext";
+import ProfilePic from "../../components/mainbuttons/profilepic";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../../routes";
+import { supabase } from "../../supabaseClient";
 
 export default function ProfileScreen() {
-  const { profile } = useAuth(); // ✅ Haal de ingelogde gebruiker op
+  const { profile } = useAuth();
   const [selectedTab, setSelectedTab] = useState("Demos");
+  const [demos, setDemos] = useState<any[]>([]);
+  const [loadingDemos, setLoadingDemos] = useState<boolean>(false);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+
+  // Haal demo's op uit de demos-tabel voor de huidige gebruiker
+  useEffect(() => {
+    const fetchDemos = async () => {
+      if (profile?.id) {
+        setLoadingDemos(true);
+        const { data, error } = await supabase
+          .from("demos")
+          .select("*")
+          .eq("profile_id", profile.id);
+        if (error) {
+          console.error("Error fetching demos:", error);
+        } else {
+          setDemos(data);
+        }
+        setLoadingDemos(false);
+      }
+    };
+    fetchDemos();
+  }, [profile]);
 
   return (
     <View style={styles.container}>
@@ -47,9 +77,7 @@ export default function ProfileScreen() {
       <View style={styles.tabs}>
         {["Demos", "Releases", "Contact"].map((tab) => (
           <TouchableOpacity key={tab} onPress={() => setSelectedTab(tab)}>
-            <Text
-              style={[styles.tabText, selectedTab === tab && styles.activeTab]}
-            >
+            <Text style={[styles.tabText, selectedTab === tab && styles.activeTab]}>
               {tab}
             </Text>
           </TouchableOpacity>
@@ -59,26 +87,41 @@ export default function ProfileScreen() {
       {/* Grid met Demo’s / Releases */}
       <View style={styles.grid}>
         {selectedTab === "Demos" ? (
-          profile?.demos && profile.demos.length > 0 ? (
-            profile.demos.map((mediaUrl: string, index: number) => (
-              <Image
-                key={index}
-                source={{ uri: mediaUrl }}
-                style={styles.gridItem}
-              />
-            ))
-          ) : (
-            <Text style={styles.noMediaText}>No demos uploaded</Text>
-          )
+          <>
+            {loadingDemos ? (
+              <ActivityIndicator size="small" color="#A020F0" />
+            ) : demos && demos.length > 0 ? (
+              demos.map((item, index) => (
+                <TouchableOpacity 
+                  key={index} 
+                  onPress={() => navigation.navigate("DemoDetail", { demoId: item.id })}
+                >
+                  <Image
+                    source={{ uri: item.thumbnail ? item.thumbnail : item.media_url }}
+                    style={styles.gridItem}
+                  />
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.noMediaText}>No demos uploaded</Text>
+            )}
+            {/* Plus-bubble */}
+            <TouchableOpacity
+              style={[styles.gridItem, styles.plusBubble]}
+              onPress={() => navigation.navigate("uploadProfileMedia")}
+            >
+              <Text style={styles.plusText}>+</Text>
+            </TouchableOpacity>
+          </>
         ) : selectedTab === "Releases" ? (
-          // Voor nu placeholders voor releases
+          // Placeholder voor Releases
           Array(6)
             .fill(null)
             .map((_, index) => (
               <View key={index} style={styles.gridItem} />
             ))
         ) : (
-          // Contact-tab (je kunt hier eventueel extra content toevoegen)
+          // Contact-tab
           <Text style={{ color: "gray" }}>Contact info...</Text>
         )}
       </View>
@@ -170,5 +213,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
     width: "100%",
   },
+  plusBubble: {
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#A020F0",
+  },
+  plusText: {
+    color: "#A020F0",
+    fontSize: 30,
+    fontWeight: "bold",
+  },
 });
+
 
