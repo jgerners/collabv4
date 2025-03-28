@@ -248,7 +248,9 @@ const PostComponent: React.FC<PostProps> = ({
               receiverId={post.userId}
             />
           )}
-          <Follow isFollowed={followed} onPress={() => setFollowed(!followed)} />
+           {currentUserId && (
+            <Follow followerId={currentUserId} followingId={post.userId} />
+          )}
         </View>
       </View>
 

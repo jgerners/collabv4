@@ -21,7 +21,7 @@ import { useAuth } from "../../context/authContext"; // ✅ AuthContext importer
 const getPresignedUrl = async (uniqueName: string, contentType: string): Promise<string | null> => {
   try {
     const response = await fetch(
-      `http://192.168.178.166:3002/get-presigned-url?fileName=${encodeURIComponent(uniqueName)}&contentType=${encodeURIComponent(contentType)}`
+      `http://192.168.178.31:3000/get-presigned-url?fileName=${encodeURIComponent(uniqueName)}&contentType=${encodeURIComponent(contentType)}`
     );
     const json = await response.json();
     return json.url;

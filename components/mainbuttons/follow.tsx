@@ -1,18 +1,27 @@
-// follow.tsx
+// Follow.tsx
 import React from "react";
-import { TouchableOpacity, Text, StyleSheet } from "react-native";
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { useFollow } from "../../hooks/useFollow"; // Zorg dat het pad klopt
 
 interface FollowProps {
-  isFollowed: boolean;
-  onPress: () => void;
+  followerId: string;  // De ingelogde gebruiker
+  followingId: string; // De gebruiker die gevolgd wordt
 }
 
-const Follow: React.FC<FollowProps> = ({ isFollowed, onPress }) => {
+const Follow: React.FC<FollowProps> = ({ followerId, followingId }) => {
+  const { isFollowing, loading, error, toggleFollow } = useFollow({ followerId, followingId });
+
+  if (loading) {
+    return <ActivityIndicator size="small" color="gray" />;
+  }
+
   return (
-    <TouchableOpacity style={styles.followBubble} onPress={onPress}>
+    <TouchableOpacity style={styles.followBubble} onPress={toggleFollow}>
       <Text style={styles.followBubbleText}>
-        {isFollowed ? "Following" : "Follow"}
+        {isFollowing ? "Following" : "Follow"}
       </Text>
+      {/* Indien gewenst, kun je eventueel ook de foutmelding weergeven */}
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </TouchableOpacity>
   );
 };
@@ -27,6 +36,11 @@ const styles = StyleSheet.create({
   followBubbleText: {
     color: "white",
     fontSize: 14,
+  },
+  errorText: {
+    color: "red",
+    fontSize: 12,
+    marginTop: 4,
   },
 });
 

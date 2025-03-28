@@ -18,6 +18,7 @@ import Requests from "../../components/requests";
 import { useAuth } from "../../context/authContext";
 import { useProfiles } from "../../hooks/useProfiles";
 import { useLikes, Like } from "../../hooks/useLikes";
+import { useFollows, FollowNotification } from "../../hooks/useFollows";
 
 // 1. Definieer het type voor jouw navigator
 export type RootStackParamList = {
@@ -30,16 +31,21 @@ export type RootStackParamList = {
 // 2. Specificeer het navigatietype voor dit scherm
 type ChatListScreenNavigationProp = StackNavigationProp<RootStackParamList, "ChatList">;
 
-// 3. Definieer de interface voor chat-items
+// 3. Definieer de interface voor chat-items (ongewijzigd)
 export interface Chat {
   id: string;
   user_a: string;
   user_b: string;
   created_at: string;
-}
+};
 
 // Gebruik de useChats-hook in plaats van dummyChats
 import { useChats } from "../../hooks/useChats";
+
+// We definiëren een union type voor notificaties
+type NotificationItem = 
+  | (Like & { type: "like" })
+  | (FollowNotification & { type: "follow" });
 
 const ChatsListScreen: React.FC = () => {
   const { user } = useAuth();
@@ -47,14 +53,16 @@ const ChatsListScreen: React.FC = () => {
   const currentUserId = user?.id || "";
   const { chats, loading: chatsLoading, error: chatsError } = useChats(currentUserId);
   const { likes, loading: likesLoading, error: likesError } = useLikes(currentUserId);
-  const [activeTab, setActiveTab] = useState<'Likes' | 'Chats' | 'Requests'>('Chats');
+  const { follows, loading: followsLoading, error: followsError } = useFollows(currentUserId);
+  // We gebruiken nu drie tabs: Notificaties (gecombineerd likes en follows), Chats en Requests.
+  const [activeTab, setActiveTab] = useState<'Notifications' | 'Chats' | 'Requests'>('Chats');
   const navigation = useNavigation<ChatListScreenNavigationProp>();
 
   const windowWidth = Dimensions.get("window").width;
-  const tabOrder: ('Likes' | 'Chats' | 'Requests')[] = ['Likes', 'Chats', 'Requests'];
+  const tabOrder: ('Notifications' | 'Chats' | 'Requests')[] = ['Notifications', 'Chats', 'Requests'];
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Zorg dat de ScrollView op de juiste pagina start (standaard 'Chats' = index 1)
+  // Zorg dat de ScrollView op de juiste pagina start
   useEffect(() => {
     const initialIndex = tabOrder.indexOf(activeTab);
     if (scrollViewRef.current) {
@@ -69,9 +77,8 @@ const ChatsListScreen: React.FC = () => {
     return `${hours}:${minutes}`;
   };
 
-  // Render Chat-item op basis van data uit useChats
+  // Render Chat-item (ongewijzigd)
   const renderChatItem = ({ item }: { item: Chat }) => {
-    // Bepaal wie de 'ander' is
     const otherUserId = item.user_a === currentUserId ? item.user_b : item.user_a;
     const otherProfile = profiles.find((p) => p.id === otherUserId);
 
@@ -89,27 +96,52 @@ const ChatsListScreen: React.FC = () => {
     );
   };
 
-  // Render Like-item op basis van data uit useLikes
-  const renderLikeItem = ({ item }: { item: Like }) => (
-    <View style={styles.likeItem}>
-      {/* Profielfoto */}
-      <Image
-        source={typeof item.userProfile === "string" ? { uri: item.userProfile } : item.userProfile}
-        style={styles.profileImage}
-      />
-      {/* Tekst */}
-      <View style={styles.likeContent}>
-        <Text style={styles.likeText}>
-          <Text style={{ fontWeight: "bold" }}>{item.userName}</Text> liked your post
-        </Text>
-      </View>
-      {/* Media */}
-      {item.media ? (
-        <Image source={{ uri: item.media }} style={styles.mediaImage} />
-      ) : null}
-    </View>
-  );
-  
+  // Render Notification-item voor zowel likes als follows
+  const renderNotificationItem = ({ item }: { item: NotificationItem }) => {
+    if (item.type === "like") {
+      return (
+        <View style={styles.notificationItem}>
+          {/* Profielfoto van de liker */}
+          <Image
+            source={typeof item.userProfile === "string" ? { uri: item.userProfile } : item.userProfile}
+            style={styles.profileImage}
+          />
+          <View style={styles.notificationContent}>
+            <Text style={styles.notificationText}>
+              <Text style={{ fontWeight: "bold" }}>{item.userName}</Text> liked your post.
+            </Text>
+          </View>
+          {/* Media van de post */}
+          {item.media ? (
+            <Image source={{ uri: item.media }} style={styles.mediaImage} />
+          ) : null}
+        </View>
+      );
+    } else if (item.type === "follow") {
+      return (
+        <View style={styles.notificationItem}>
+          {/* Profielfoto van de volger */}
+          <Image
+            source={typeof item.followerProfile === "string" ? { uri: item.followerProfile } : item.followerProfile}
+            style={styles.profileImage}
+          />
+          <View style={styles.notificationContent}>
+            <Text style={styles.notificationText}>
+              <Text style={{ fontWeight: "bold" }}>{item.followerName}</Text> started following you.
+            </Text>
+          </View>
+        </View>
+      );
+    }
+    return null;
+  };
+
+  // Combineer likes en follows tot notificaties
+  const notifications: NotificationItem[] = [
+    ...likes.map((like) => ({ ...like, type: "like" as const })),
+    ...follows.map((follow) => ({ ...follow, type: "follow" as const })),
+  ].sort((a, b) => b.timestamp - a.timestamp);
+
   const handleMomentumScrollEnd = (event: any) => {
     const newIndex = Math.round(event.nativeEvent.contentOffset.x / windowWidth);
     const newTab = tabOrder[newIndex];
@@ -141,19 +173,21 @@ const ChatsListScreen: React.FC = () => {
         contentOffset={{ x: windowWidth, y: 0 }}
         onMomentumScrollEnd={handleMomentumScrollEnd}
       >
-        {/* Pagina voor Likes */}
+        {/* Notificaties (Likes + Follows) */}
         <View style={{ width: windowWidth, padding: 16 }}>
-          {likesLoading ? (
+          {likesLoading || followsLoading ? (
             <ActivityIndicator size="large" color="#A020F0" />
-          ) : likesError ? (
-            <Text style={styles.emptyText}>Error: {likesError}</Text>
-          ) : likes.length === 0 ? (
-            <Text style={styles.emptyText}>You haven't received any likes yet.</Text>
+          ) : likesError || followsError ? (
+            <Text style={styles.emptyText}>
+              Error: {likesError || followsError}
+            </Text>
+          ) : notifications.length === 0 ? (
+            <Text style={styles.emptyText}>You haven't received any notifications yet.</Text>
           ) : (
-            <FlatList data={likes} renderItem={renderLikeItem} keyExtractor={(item) => item.id} />
+            <FlatList data={notifications} renderItem={renderNotificationItem} keyExtractor={(item) => item.id} />
           )}
         </View>
-        {/* Pagina voor Chats */}
+        {/* Chats */}
         <View style={{ width: windowWidth, padding: 16 }}>
           {chatsLoading ? (
             <ActivityIndicator size="large" color="#A020F0" />
@@ -165,7 +199,7 @@ const ChatsListScreen: React.FC = () => {
             <FlatList data={chats} renderItem={renderChatItem} keyExtractor={(item) => item.id} />
           )}
         </View>
-        {/* Pagina voor Requests */}
+        {/* Requests */}
         <View style={{ width: windowWidth, padding: 16 }}>
           <Requests />
         </View>
@@ -205,7 +239,7 @@ const styles = StyleSheet.create({
   userName: { fontSize: 16, fontWeight: "bold", color: "#FFF" },
   timestamp: { fontSize: 12, color: "#A0A0A0" },
   lastMessage: { fontSize: 14, color: "#A0A0A0" },
-  likeItem: {
+  notificationItem: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#1E1E1E",
@@ -213,8 +247,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
   },
-  likeContent: { flex: 1, marginLeft: 10 },
-  likeText: { color: "#FFF", fontSize: 14 },
-  mediaImage: { width: 60, height: 60, borderRadius: 8, marginTop: 3 },
+  notificationContent: { flex: 1, marginLeft: 10 },
+  notificationText: { color: "#FFF", fontSize: 14 },
+  mediaImage: { width: 60, height: 60, borderRadius: 8, marginLeft: 10 },
   emptyText: { color: "#A0A0A0", textAlign: "center", marginTop: 20, fontSize: 16 },
 });
