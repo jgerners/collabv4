@@ -1,3 +1,4 @@
+// PostComponent.tsx
 import React, { useRef, useState, useEffect } from "react";
 import {
   View,
@@ -17,6 +18,7 @@ import { useAuth } from "../context/authContext";
 import Slider from "@react-native-community/slider";
 
 import ProfileLink from "./profileLink";
+// We import de nieuwe Like-component die de useLike-hook intern gebruikt.
 import Like from "./mainbuttons/like";
 import Follow from "./mainbuttons/follow";
 import PlayPause from "./mainbuttons/play_pause";
@@ -81,13 +83,12 @@ const PostComponent: React.FC<PostProps> = ({
 }) => {
   const { user } = useAuth();
   const currentUserId = user?.id;
-  const [liked, setLiked] = useState(post.isLiked);
+  // Verwijder de lokale like state, deze wordt nu afgehandeld door de Like-component.
   const [followed, setFollowed] = useState(post.isFollowed);
   const [isPlaying, setIsPlaying] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   // Geeft aan of de gebruiker handmatig gepauzeerd heeft
   const [manualPaused, setManualPaused] = useState(false);
-
   // Bepaalt of de beschrijving meer dan 2 regels heeft
   const [showSeeMore, setShowSeeMore] = useState(false);
 
@@ -153,9 +154,6 @@ const PostComponent: React.FC<PostProps> = ({
       setDuration(status.durationMillis);
     }
   };
-
-  // We halen de oude logica voor het animeren van de seekbar eruit
-  // Dus de seekbar is nu altijd zichtbaar
 
   // Open de beschrijving en laat de container uitbreiden via LayoutAnimation
   const toggleDescription = () => {
@@ -242,16 +240,20 @@ const PostComponent: React.FC<PostProps> = ({
           </ProfileLink>
         </View>
         <View style={styles.headerButtons}>
-          <Like isLiked={liked} onPress={() => setLiked(!liked)} />
+          {/* De Like-knop: we geven nu ook receiverId mee (de eigenaar van de post) */}
+          {currentUserId && (
+            <Like
+              postId={post.id}
+              userId={currentUserId}
+              receiverId={post.userId}
+            />
+          )}
           <Follow isFollowed={followed} onPress={() => setFollowed(!followed)} />
         </View>
       </View>
 
       {/* Media (vertical, portretverhouding 13:16) */}
-      <Pressable
-        onPress={handlePlayPause}
-        style={styles.mediaContainer}
-      >
+      <Pressable onPress={handlePlayPause} style={styles.mediaContainer}>
         {post.mediaType === "video" ? (
           <Video
             ref={videoRef}
@@ -399,10 +401,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  // Media container met portretverhouding (13:16) en gecentreerd
   mediaContainer: {
-    width: scale * 345, // aangepast naar een vaste, kleinere breedte
-  
+    width: scale * 345,
     borderRadius: scale * 10,
     overflow: "hidden",
     backgroundColor: "#000",
@@ -414,7 +414,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  // Nieuwe Controls Container
   controlsContainer: {
     position: "absolute",
     bottom: scale * 2,
@@ -425,12 +424,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   playButtonContainer: {
-    width: scale * 30,  // Aangepaste kleinere grootte
-    height: scale * 30, // Aangepaste kleinere grootte
+    width: scale * 30,
+    height: scale * 30,
     justifyContent: "center",
     alignItems: "center",
     bottom: scale * 10,
-    right: 8
+    right: 8,
   },
   seekbarContainer: {
     width: scale * 200,
@@ -439,10 +438,9 @@ const styles = StyleSheet.create({
     width: scale * 40,
     height: scale * 40,
   },
-  // Overlay voor titel en beschrijving in de media
   infoOverlay: {
     position: "absolute",
-    bottom: scale * 45, // net boven de controls
+    bottom: scale * 45,
     left: scale * 10,
     right: scale * 10,
     backgroundColor: "rgba(0,0,0,0.0)",

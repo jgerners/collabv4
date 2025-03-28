@@ -1,3 +1,4 @@
+// ChatsListScreen.tsx
 import React, { useEffect, useRef, useState } from "react";
 import {
   SafeAreaView,
@@ -15,6 +16,8 @@ import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import Requests from "../../components/requests";
 import { useAuth } from "../../context/authContext";
+import { useProfiles } from "../../hooks/useProfiles";
+import { useLikes, Like } from "../../hooks/useLikes";
 
 // 1. Definieer het type voor jouw navigator
 export type RootStackParamList = {
@@ -28,32 +31,22 @@ export type RootStackParamList = {
 type ChatListScreenNavigationProp = StackNavigationProp<RootStackParamList, "ChatList">;
 
 // 3. Definieer de interface voor chat-items
-// Deze interface kan worden aangepast naar wat je in de useChats-hook retourneert.
 export interface Chat {
   id: string;
   user_a: string;
   user_b: string;
   created_at: string;
-  // Voeg eventueel extra velden toe (zoals de naam en profielfoto van de 'ander')
-  // Als je deze informatie niet direct in de "chats" tabel hebt opgeslagen, kun je deze later
-  // via een JOIN of een aparte API-call ophalen.
 }
 
 // Gebruik de useChats-hook in plaats van dummyChats
 import { useChats } from "../../hooks/useChats";
 
-// Dummy data voor Likes, voor nu
-const dummyLikes = [
-  { id: "1", userName: "Skipvdv", userProfile: require("../../assets/dummy/profile/dua_profile.png"), postImage: require("../../assets/dummy/profile/dua_profile.png"), timestamp: Date.now() - 180000 },
-  { id: "2", userName: "Dua Lipa", userProfile: require("../../assets/dummy/profile/dua_profile.png"), postImage: require("../../assets/dummy/profile/dua_profile.png"), timestamp: Date.now() - 300000 },
-];
-
 const ChatsListScreen: React.FC = () => {
   const { user } = useAuth();
+  const { profiles, loading: profilesLoading, error: profilesError } = useProfiles();
   const currentUserId = user?.id || "";
   const { chats, loading: chatsLoading, error: chatsError } = useChats(currentUserId);
-  const [likes, setLikes] = useState(dummyLikes);
-  const [loading, setLoading] = useState(false);
+  const { likes, loading: likesLoading, error: likesError } = useLikes(currentUserId);
   const [activeTab, setActiveTab] = useState<'Likes' | 'Chats' | 'Requests'>('Chats');
   const navigation = useNavigation<ChatListScreenNavigationProp>();
 
@@ -76,44 +69,47 @@ const ChatsListScreen: React.FC = () => {
     return `${hours}:${minutes}`;
   };
 
-  // Voor Chats gebruiken we nu de data uit useChats
+  // Render Chat-item op basis van data uit useChats
   const renderChatItem = ({ item }: { item: Chat }) => {
     // Bepaal wie de 'ander' is
     const otherUserId = item.user_a === currentUserId ? item.user_b : item.user_a;
+    const otherProfile = profiles.find((p) => p.id === otherUserId);
 
-    // Placeholder: Je zou hier extra informatie (naam, profielfoto) van de 'ander' willen tonen.
     return (
       <TouchableOpacity style={styles.chatItem} onPress={() => navigation.navigate("Chat", { chatId: item.id })}>
-        <Image source={{ uri: "https://via.placeholder.com/50" }} style={styles.profileImage} />
+        <Image source={{ uri: otherProfile?.profile_pic }} style={styles.profileImage} />
         <View style={styles.chatDetails}>
           <View style={styles.chatHeader}>
-            <Text style={styles.userName}>Chat with {otherUserId}</Text>
-            {/* Voor nu gebruiken we de timestamp als placeholder */}
+            <Text style={styles.userName}>{otherProfile?.username || otherUserId}</Text>
             <Text style={styles.timestamp}>{formatTime(new Date(item.created_at).getTime())}</Text>
           </View>
-          {/* Placeholder voor de laatste boodschap */}
-          <Text style={styles.lastMessage}>Last message...</Text>
+          <Text style={styles.lastMessage}>Chat with {otherProfile?.username || otherUserId}</Text>
         </View>
       </TouchableOpacity>
     );
   };
 
-  const renderLikeItem = ({ item }: { item: any }) => (
+  // Render Like-item op basis van data uit useLikes
+  const renderLikeItem = ({ item }: { item: Like }) => (
     <View style={styles.likeItem}>
+      {/* Profielfoto */}
       <Image
         source={typeof item.userProfile === "string" ? { uri: item.userProfile } : item.userProfile}
         style={styles.profileImage}
       />
-      <Text style={styles.likeText}>
-        <Text style={{ fontWeight: 'bold' }}>{item.userName}</Text> liked your post
-      </Text>
-      <Image
-        source={typeof item.postImage === "string" ? { uri: item.postImage } : item.postImage}
-        style={styles.postImage}
-      />
+      {/* Tekst */}
+      <View style={styles.likeContent}>
+        <Text style={styles.likeText}>
+          <Text style={{ fontWeight: "bold" }}>{item.userName}</Text> liked your post
+        </Text>
+      </View>
+      {/* Media */}
+      {item.media ? (
+        <Image source={{ uri: item.media }} style={styles.mediaImage} />
+      ) : null}
     </View>
   );
-
+  
   const handleMomentumScrollEnd = (event: any) => {
     const newIndex = Math.round(event.nativeEvent.contentOffset.x / windowWidth);
     const newTab = tabOrder[newIndex];
@@ -147,9 +143,17 @@ const ChatsListScreen: React.FC = () => {
       >
         {/* Pagina voor Likes */}
         <View style={{ width: windowWidth, padding: 16 }}>
-          <FlatList data={likes} renderItem={renderLikeItem} keyExtractor={(item) => item.id} />
+          {likesLoading ? (
+            <ActivityIndicator size="large" color="#A020F0" />
+          ) : likesError ? (
+            <Text style={styles.emptyText}>Error: {likesError}</Text>
+          ) : likes.length === 0 ? (
+            <Text style={styles.emptyText}>You haven't received any likes yet.</Text>
+          ) : (
+            <FlatList data={likes} renderItem={renderLikeItem} keyExtractor={(item) => item.id} />
+          )}
         </View>
-        {/* Pagina voor Chats (gebruik useChats data) */}
+        {/* Pagina voor Chats */}
         <View style={{ width: windowWidth, padding: 16 }}>
           {chatsLoading ? (
             <ActivityIndicator size="large" color="#A020F0" />
@@ -209,12 +213,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
   },
-  likeText: { flex: 1, color: "#FFF", fontSize: 14, marginLeft: 10 },
-  postImage: { width: 40, height: 40, borderRadius: 8, marginLeft: 10 },
-  emptyText: { 
-    color: "#A0A0A0", 
-    textAlign: "center", 
-    marginTop: 20, 
-    fontSize: 16 
-  },
+  likeContent: { flex: 1, marginLeft: 10 },
+  likeText: { color: "#FFF", fontSize: 14 },
+  mediaImage: { width: 60, height: 60, borderRadius: 8, marginTop: 3 },
+  emptyText: { color: "#A0A0A0", textAlign: "center", marginTop: 20, fontSize: 16 },
 });

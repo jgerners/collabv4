@@ -1,20 +1,28 @@
-// like.tsx
+// Like.tsx
 import React from "react";
-import { TouchableOpacity, StyleSheet } from "react-native";
+import { TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
+import { useLike } from "../../hooks/useLike"; // Zorg dat het pad klopt
 
 interface LikeProps {
-  isLiked: boolean;
-  onPress: () => void;
+  postId: string;
+  userId: string;
+  receiverId: string; // Nieuwe prop: de eigenaar van de post
 }
 
-const Like: React.FC<LikeProps> = ({ isLiked, onPress }) => {
+const Like: React.FC<LikeProps> = ({ postId, userId, receiverId }) => {
+  const { liked, toggleLike, loading } = useLike({ userId, postId, receiverId });
+
+  if (loading) {
+    return <ActivityIndicator size="small" color="gray" />;
+  }
+
   return (
-    <TouchableOpacity onPress={onPress} style={styles.likeButton}>
+    <TouchableOpacity onPress={toggleLike} style={styles.likeButton}>
       <Icon
-        name={isLiked ? "heart" : "heart-outline"}
+        name={liked ? "heart" : "heart-outline"}
         size={25}
-        color={isLiked ? "red" : "white"}
+        color={liked ? "red" : "white"}
       />
     </TouchableOpacity>
   );
