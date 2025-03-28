@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import { useAuth } from "../../context/authContext"; // ✅ User ophalen
 import ProfilePic from "../../components/mainbuttons/profilepic"; // ✅ Gebruik je component
 import Username from "../../components/mainbuttons/username"; // ✅ Gebruik je component
@@ -7,36 +7,36 @@ import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../../routes";
 
-
-
-
-
-
 export default function ProfileScreen() {
   const { profile } = useAuth(); // ✅ Haal de ingelogde gebruiker op
   const [selectedTab, setSelectedTab] = useState("Demos");
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-  
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-      <Text style={styles.profileText}>{profile?.username || "Gebruiker"}</Text>
+        <Text style={styles.profileText}>
+          {profile?.username || "Gebruiker"}
+        </Text>
       </View>
 
       {/* Profielfoto */}
       <TouchableOpacity style={styles.profileImageContainer}>
-      <ProfilePic uri={profile?.profile_pic || "https://via.placeholder.com/100"} />
+        <ProfilePic
+          uri={profile?.profile_pic || "https://via.placeholder.com/100"}
+        />
       </TouchableOpacity>
 
       {/* Gebruikersinformatie */}
-      <Text style={styles.displayname}>{profile?.display_name || "Geen display naam"}</Text>
+      <Text style={styles.displayname}>
+        {profile?.display_name || "Geen display naam"}
+      </Text>
       <Text style={styles.role}>{profile?.role || "Onbekende rol"}</Text>
       <Text style={styles.bio}>{profile?.bio || "Geen bio beschikbaar"}</Text>
 
-           {/* Edit Profile knop */}
-           <TouchableOpacity
+      {/* Edit Profile knop */}
+      <TouchableOpacity
         style={styles.editProfileButton}
         onPress={() => navigation.navigate("EditProfile")}
       >
@@ -47,7 +47,9 @@ export default function ProfileScreen() {
       <View style={styles.tabs}>
         {["Demos", "Releases", "Contact"].map((tab) => (
           <TouchableOpacity key={tab} onPress={() => setSelectedTab(tab)}>
-            <Text style={[styles.tabText, selectedTab === tab && styles.activeTab]}>
+            <Text
+              style={[styles.tabText, selectedTab === tab && styles.activeTab]}
+            >
               {tab}
             </Text>
           </TouchableOpacity>
@@ -56,11 +58,29 @@ export default function ProfileScreen() {
 
       {/* Grid met Demo’s / Releases */}
       <View style={styles.grid}>
-        {Array(6)
-          .fill(null)
-          .map((_, index) => (
-            <View key={index} style={styles.gridItem} />
-          ))}
+        {selectedTab === "Demos" ? (
+          profile?.demos && profile.demos.length > 0 ? (
+            profile.demos.map((mediaUrl: string, index: number) => (
+              <Image
+                key={index}
+                source={{ uri: mediaUrl }}
+                style={styles.gridItem}
+              />
+            ))
+          ) : (
+            <Text style={styles.noMediaText}>No demos uploaded</Text>
+          )
+        ) : selectedTab === "Releases" ? (
+          // Voor nu placeholders voor releases
+          Array(6)
+            .fill(null)
+            .map((_, index) => (
+              <View key={index} style={styles.gridItem} />
+            ))
+        ) : (
+          // Contact-tab (je kunt hier eventueel extra content toevoegen)
+          <Text style={{ color: "gray" }}>Contact info...</Text>
+        )}
       </View>
     </View>
   );
@@ -106,7 +126,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 20,
   },
-
   editProfileButton: {
     backgroundColor: "#A020F0",
     paddingVertical: 8,
@@ -146,4 +165,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
   },
+  noMediaText: {
+    color: "gray",
+    textAlign: "center",
+    width: "100%",
+  },
 });
+
