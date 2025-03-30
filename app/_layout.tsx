@@ -42,31 +42,19 @@ function TabsLayout() {
         headerBackground: () => (
           <BlurView intensity={50} tint="dark" style={styles.headerBackground} />
         ),
-        headerTitleAlign: 'left',
+        headerTitleAlign: 'center',
         headerTitleStyle: {
           fontSize: 25,
           fontWeight: 'bold',
           color: 'white',
         },
-        headerRight: () => (
-          <View style={styles.headerRightContainer}>
-            <TouchableOpacity>
-              <Image
-                source={{ uri: profile?.profile_pic || "https://via.placeholder.com/100" }} // ✅ Profielfoto dynamisch maken
-                style={styles.profileImage}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity style={{ marginLeft: 15 }}>
-              <IconSymbol size={24} name="magnifyingglass" color="white" />
-            </TouchableOpacity>
-          </View>
-        ),
+       
         tabBarBackground: () => (
           <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
         ),
         tabBarStyle: Platform.select({
-          ios: { position: 'absolute', height: 80, backgroundColor: 'rgba(57, 57, 57, 0.81)' },
-          default: { height: 80, backgroundColor: 'rgba(57, 57, 57, 0.81)' }
+          ios: { position: 'absolute', height: 80, backgroundColor: 'rgba(0, 0, 0, 0.81)',  borderTopWidth: 0, },
+          default: { height: 80, backgroundColor: 'rgba(17, 17, 17, 0.81)' }
         }),
       }}
     >
@@ -192,16 +180,7 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  headerRightContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  profileImage: {
-    width: 25,
-    height: 25,
-    borderRadius: 20,
-  },
+
   headerBackground: {
     flex: 1,
     backgroundColor: 'rgba(23, 23, 23, 0.81)',

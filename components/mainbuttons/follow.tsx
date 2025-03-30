@@ -28,7 +28,7 @@ const Follow: React.FC<FollowProps> = ({ followerId, followingId }) => {
 
 const styles = StyleSheet.create({
   followBubble: {
-    backgroundColor: "purple",
+    backgroundColor: "#6A0DAD",
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 15,

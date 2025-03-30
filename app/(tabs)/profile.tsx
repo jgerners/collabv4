@@ -14,6 +14,8 @@ import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../../routes";
 import { supabase } from "../../supabaseClient";
+import MediaModal from "../../components/demoModule"; // Pas de import aan op basis van je mappenstructuur
+import DemoModule from "../../components/demoModule";
 
 export default function ProfileScreen() {
   const { profile } = useAuth();
@@ -22,7 +24,10 @@ export default function ProfileScreen() {
   const [loadingDemos, setLoadingDemos] = useState<boolean>(false);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
-  // Haal demo's op uit de demos-tabel voor de huidige gebruiker
+  // State voor de modal
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<any>(null);
+
   useEffect(() => {
     const fetchDemos = async () => {
       if (profile?.id) {
@@ -41,6 +46,16 @@ export default function ProfileScreen() {
     };
     fetchDemos();
   }, [profile]);
+
+  const openModal = (mediaItem: any) => {
+    setSelectedMedia(mediaItem);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setSelectedMedia(null);
+  };
 
   return (
     <View style={styles.container}>
@@ -94,7 +109,7 @@ export default function ProfileScreen() {
               demos.map((item, index) => (
                 <TouchableOpacity 
                   key={index} 
-                  onPress={() => navigation.navigate("DemoDetail", { demoId: item.id })}
+                  onPress={() => openModal(item)}
                 >
                   <Image
                     source={{ uri: item.thumbnail ? item.thumbnail : item.media_url }}
@@ -105,7 +120,6 @@ export default function ProfileScreen() {
             ) : (
               <Text style={styles.noMediaText}>No demos uploaded</Text>
             )}
-            {/* Plus-bubble */}
             <TouchableOpacity
               style={[styles.gridItem, styles.plusBubble]}
               onPress={() => navigation.navigate("uploadProfileMedia")}
@@ -114,17 +128,24 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </>
         ) : selectedTab === "Releases" ? (
-          // Placeholder voor Releases
           Array(6)
             .fill(null)
             .map((_, index) => (
               <View key={index} style={styles.gridItem} />
             ))
         ) : (
-          // Contact-tab
           <Text style={{ color: "gray" }}>Contact info...</Text>
         )}
       </View>
+
+      {/* Gebruik het aparte MediaModal component */}
+      {selectedMedia && (
+        <DemoModule 
+          visible={modalVisible} 
+          mediaItem={selectedMedia} 
+          onClose={closeModal} 
+        />
+      )}
     </View>
   );
 }
@@ -153,7 +174,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E1E1E",
     justifyContent: "center",
     alignItems: "center",
-    position: "relative",
     marginBottom: 10,
   },
   displayname: {
@@ -225,5 +245,3 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
-
-

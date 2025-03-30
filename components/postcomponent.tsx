@@ -1,4 +1,3 @@
-// PostComponent.tsx
 import React, { useRef, useState, useEffect } from "react";
 import {
   View,
@@ -13,18 +12,18 @@ import {
   LayoutAnimation,
 } from "react-native";
 import { Video, ResizeMode, Audio } from "expo-av";
-import { useNavigation } from "@react-navigation/native";
+import { useIsFocused } from "@react-navigation/native";
 import { useAuth } from "../context/authContext";
 import Slider from "@react-native-community/slider";
 
 import ProfileLink from "./profileLink";
-// We import de nieuwe Like-component die de useLike-hook intern gebruikt.
 import Like from "./mainbuttons/like";
 import Follow from "./mainbuttons/follow";
 import PlayPause from "./mainbuttons/play_pause";
 import Collab from "./mainbuttons/collab";
 import ArtistTag from "./mainbuttons/tags/artist_tags";
 import GenreTag from "./mainbuttons/tags/genre_tags";
+import ReplayButton from "./mainbuttons/replay"; // ReplayButton als los component
 
 // Activeer LayoutAnimation op Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -68,7 +67,6 @@ export interface PostData {
 
 interface PostProps {
   post: PostData;
-  onPlayPause: (postId: string) => Promise<void>;
   artistTags: ArtistTagData[];
   genreTags: GenreTagData[];
   isActive: boolean; // Geeft aan of de post via scroll automatisch moet afspelen
@@ -77,28 +75,137 @@ interface PostProps {
 const PostComponent: React.FC<PostProps> = ({
   post,
   isActive,
-  onPlayPause,
   artistTags,
   genreTags,
 }) => {
   const { user } = useAuth();
   const currentUserId = user?.id;
-  // Verwijder de lokale like state, deze wordt nu afgehandeld door de Like-component.
   const [followed, setFollowed] = useState(post.isFollowed);
   const [isPlaying, setIsPlaying] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
-  // Geeft aan of de gebruiker handmatig gepauzeerd heeft
   const [manualPaused, setManualPaused] = useState(false);
-  // Bepaalt of de beschrijving meer dan 2 regels heeft
   const [showSeeMore, setShowSeeMore] = useState(false);
 
   const videoRef = useRef<Video | null>(null);
   const audioRef = useRef<Audio.Sound | null>(null);
 
-  // Houdt de totale duur van de media bij
   const [duration, setDuration] = useState(0);
-  // Houdt de huidige positie (in millis) bij
   const [currentTime, setCurrentTime] = useState(0);
+
+  const isFocused = useIsFocused();
+  // Sla op of de media vóór focusverlies speelde
+  const wasPlayingBeforeFocusLoss = useRef(false);
+
+  const awaitOrIgnore = async (fn: () => Promise<any>) => {
+    try {
+      await fn();
+    } catch (error) {
+      console.error("Ignored error:", error);
+    }
+  };
+
+  const updatePlaybackStatus = (status: any) => {
+    if (status.isLoaded) {
+      setCurrentTime(status.positionMillis);
+      setDuration(status.durationMillis);
+    }
+  };
+
+  const toggleDescription = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setDescriptionExpanded(!descriptionExpanded);
+  };
+
+  // EFFECT 1: Reactie op scroll- (isActive) en focus samen (bij mount en scroll)
+  useEffect(() => {
+    // Alleen wanneer het scherm gefocust is (anders kan auto-play al gepauzeerd worden)
+    if (isFocused) {
+      if (isActive) {
+        if (!manualPaused && !isPlaying) {
+          if (post.mediaType === "video" && videoRef.current) {
+            console.log(`Auto-playing video ${post.id} from beginning (scroll)`);
+            awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
+            awaitOrIgnore(() => videoRef.current!.playAsync());
+            setIsPlaying(true);
+          } else if (post.mediaType === "photo" && post.audio) {
+            if (!audioRef.current) {
+              const handleAudio = async () => {
+                console.log(`Auto-loading and playing audio for post ${post.id} from beginning (scroll)`);
+                try {
+                  const audioUri = typeof post.audio === "string" ? post.audio : post.audio!.toString();
+                  const { sound } = await Audio.Sound.createAsync(
+                    { uri: audioUri },
+                    { shouldPlay: true }
+                  );
+                  audioRef.current = sound;
+                  setIsPlaying(true);
+                  sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+                } catch (error) {
+                  console.error("Error auto-loading audio:", error);
+                }
+              };
+              handleAudio();
+            }
+          }
+        }
+      } else {
+        // Als de post niet actief is, pauzeer en reset de media (bij scroll)
+        if (post.mediaType === "video" && videoRef.current) {
+          console.log(`Auto-pausing video ${post.id} (scroll)`);
+          awaitOrIgnore(() => videoRef.current!.pauseAsync());
+          awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
+          setIsPlaying(false);
+        } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+          console.log(`Auto-stopping and unloading audio for post ${post.id} (scroll)`);
+          awaitOrIgnore(() => audioRef.current!.stopAsync());
+          awaitOrIgnore(() => audioRef.current!.unloadAsync());
+          audioRef.current = null;
+          setIsPlaying(false);
+        }
+        setManualPaused(false);
+      }
+    }
+  }, [isActive, isFocused]);
+
+  // EFFECT 2: Reactie op navigatiefocus (isFocused) los van scroll
+  useEffect(() => {
+    if (!isFocused) {
+      // Sla op of er aan het spelen was vóór focusverlies
+      wasPlayingBeforeFocusLoss.current = isPlaying;
+      console.log(`Screen lost focus - pausing media for post ${post.id}`);
+      if (post.mediaType === "video" && videoRef.current) {
+        awaitOrIgnore(() => videoRef.current!.pauseAsync());
+      } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+        awaitOrIgnore(() => audioRef.current!.pauseAsync());
+      }
+      setIsPlaying(false);
+    } else {
+      // Als het scherm weer gefocust is, hervat de media als die vóór focusverlies speelde
+      if (wasPlayingBeforeFocusLoss.current && !manualPaused && !isPlaying) {
+        console.log(`Screen refocused - resuming media for post ${post.id}`);
+        if (post.mediaType === "video" && videoRef.current) {
+          awaitOrIgnore(() => videoRef.current!.playAsync());
+          setIsPlaying(true);
+        } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+          awaitOrIgnore(() => audioRef.current!.playAsync());
+          setIsPlaying(true);
+        }
+      }
+      wasPlayingBeforeFocusLoss.current = false;
+    }
+  }, [isFocused]);
+
+  useEffect(() => {
+    if (!isActive && manualPaused) {
+      setManualPaused(false);
+    }
+  }, [isActive]);
+
+  useEffect(() => {
+    if (post.mediaType === "video" && videoRef.current) {
+      videoRef.current.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+    }
+  }, [post.mediaType]);
 
   // Handmatige play/pause functie (wanneer de gebruiker tikt)
   const handlePlayPause = async () => {
@@ -139,86 +246,20 @@ const PostComponent: React.FC<PostProps> = ({
     }
   };
 
-  // Helper: async wrapper om fouten te negeren
-  const awaitOrIgnore = async (fn: () => Promise<any>) => {
-    try {
-      await fn();
-    } catch (error) {
-      console.error("Ignored error:", error);
-    }
-  };
-
-  const updatePlaybackStatus = (status: any) => {
-    if (status.isLoaded) {
-      setCurrentTime(status.positionMillis);
-      setDuration(status.durationMillis);
-    }
-  };
-
-  // Open de beschrijving en laat de container uitbreiden via LayoutAnimation
-  const toggleDescription = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setDescriptionExpanded(!descriptionExpanded);
-  };
-
-  // useEffect voor automatische play/pause op basis van scroll (isActive)
-  useEffect(() => {
-    if (isActive) {
-      if (!manualPaused && !isPlaying) {
-        if (post.mediaType === "video" && videoRef.current) {
-          console.log(`Auto-playing video ${post.id} from beginning`);
-          awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
-          awaitOrIgnore(() => videoRef.current!.playAsync());
-          setIsPlaying(true);
-        } else if (post.mediaType === "photo" && post.audio) {
-          if (!audioRef.current) {
-            const handleAudio = async () => {
-              console.log(`Auto-loading and playing audio for post ${post.id} from beginning`);
-              try {
-                const audioUri = typeof post.audio === "string" ? post.audio : post.audio!.toString();
-                const { sound } = await Audio.Sound.createAsync(
-                  { uri: audioUri },
-                  { shouldPlay: true }
-                );
-                audioRef.current = sound;
-                setIsPlaying(true);
-                sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
-              } catch (error) {
-                console.error("Error auto-loading audio:", error);
-              }
-            };
-            handleAudio();
-          }
-        }
-      }
-    } else {
-      if (post.mediaType === "video" && videoRef.current) {
-        console.log(`Auto-pausing video ${post.id}`);
-        awaitOrIgnore(() => videoRef.current!.pauseAsync());
-        awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
-        setIsPlaying(false);
-      } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
-        console.log(`Auto-stopping and unloading audio for post ${post.id}`);
-        awaitOrIgnore(() => audioRef.current!.stopAsync());
-        awaitOrIgnore(() => audioRef.current!.unloadAsync());
-        audioRef.current = null;
-        setIsPlaying(false);
-      }
-      setManualPaused(false);
-    }
-  }, [isActive, manualPaused, isPlaying, post.mediaType, post.audio, post.id]);
-
-  useEffect(() => {
-    if (!isActive && manualPaused) {
-      setManualPaused(false);
-    }
-  }, [isActive]);
-
-  useEffect(() => {
+  // Nieuwe replay functie: start de media opnieuw vanaf het begin
+  const handleReplay = async () => {
     if (post.mediaType === "video" && videoRef.current) {
-      videoRef.current.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+      console.log(`Replaying video ${post.id}`);
+      awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
+      awaitOrIgnore(() => videoRef.current!.playAsync());
+      setIsPlaying(true);
+    } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+      console.log(`Replaying audio for post ${post.id}`);
+      awaitOrIgnore(() => audioRef.current!.setPositionAsync(0));
+      awaitOrIgnore(() => audioRef.current!.playAsync());
+      setIsPlaying(true);
     }
-  }, [post.mediaType]);
+  };
 
   return (
     <View style={styles.postContainer}>
@@ -240,21 +281,16 @@ const PostComponent: React.FC<PostProps> = ({
           </ProfileLink>
         </View>
         <View style={styles.headerButtons}>
-          {/* De Like-knop: we geven nu ook receiverId mee (de eigenaar van de post) */}
           {currentUserId && (
-            <Like
-              postId={post.id}
-              userId={currentUserId}
-              receiverId={post.userId}
-            />
+            <Like postId={post.id} userId={currentUserId} receiverId={post.userId} />
           )}
-           {currentUserId && (
+          {currentUserId && (
             <Follow followerId={currentUserId} followingId={post.userId} />
           )}
         </View>
       </View>
 
-      {/* Media (vertical, portretverhouding 13:16) */}
+      {/* Media Container */}
       <Pressable onPress={handlePlayPause} style={styles.mediaContainer}>
         {post.mediaType === "video" ? (
           <Video
@@ -270,13 +306,11 @@ const PostComponent: React.FC<PostProps> = ({
           <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
         )}
 
-        {/* Nieuwe Controls Container, die nu altijd zichtbaar is */}
+        {/* Controls Container */}
         <View style={styles.controlsContainer}>
-          {/* Play/Pause knop */}
           <View style={styles.playButtonContainer}>
             <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
           </View>
-          {/* Seekbar */}
           <View style={styles.seekbarContainer}>
             <Slider
               style={{ width: scale * 200, height: scale * 20 }}
@@ -301,13 +335,11 @@ const PostComponent: React.FC<PostProps> = ({
               }}
             />
           </View>
-          {/* Placeholder voor replay/save knop */}
-          <View style={styles.placeholder}>
-            {/* Later toevoegen */}
-          </View>
+          {/* Gebruik het ReplayButton-component */}
+          <ReplayButton onPress={handleReplay} />
         </View>
 
-        {/* Titel & Beschrijving overlay in de media */}
+        {/* Info Overlay */}
         <View style={styles.infoOverlay}>
           <Text style={styles.postTitle}>{post.title}</Text>
           <Text
@@ -316,7 +348,6 @@ const PostComponent: React.FC<PostProps> = ({
           >
             {post.description}
           </Text>
-          {/* Onzichtbare tekst voor meting aantal regels */}
           <Text
             style={[styles.postDescription, styles.hiddenText]}
             onTextLayout={(e) => {
@@ -475,6 +506,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: scale * 10,
     paddingHorizontal: scale * 10,
+    right: scale * 10
   },
   artistTagsContainer: {
     flexDirection: "row",
@@ -489,6 +521,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-end",
     marginTop: scale * -28,
+    left: scale * 10
   },
   collabButtonDisabled: {},
   collabText: {},

@@ -48,7 +48,8 @@
     "react-native-slider": "^0.11.0",
     "react-native-web": "~0.19.13",
     "react-native-webview": "13.12.5",
-    "expo-video-thumbnails": "~9.0.3"
+    "expo-video-thumbnails": "~9.0.3",
+    "expo-linear-gradient": "~14.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
