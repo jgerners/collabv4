@@ -1,17 +1,19 @@
-// demoModule.tsx
 import React, { useEffect, useRef, useState } from "react";
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  Image, 
-  Modal, 
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  Modal,
   Animated,
   Easing,
-  StyleSheet 
+  StyleSheet,
 } from "react-native";
 import { BlurView } from "expo-blur";
 import { Audio } from "expo-av";
+import Slider from "@react-native-community/slider";
+import PlayPause from "../components/mainbuttons/play_pause";
+import ReplayButton from "../components/mainbuttons/replay";
 
 type DemoModuleProps = {
   visible: boolean;
@@ -29,7 +31,7 @@ export default function DemoModule({ visible, mediaItem, onClose }: DemoModulePr
 
   useEffect(() => {
     if (visible && mediaItem) {
-      // Start de inzoom-animatie
+      // Start de zoom-animatie
       Animated.timing(scaleAnim, {
         toValue: 1,
         duration: 300,
@@ -45,8 +47,8 @@ export default function DemoModule({ visible, mediaItem, onClose }: DemoModulePr
     }
   }, [visible, mediaItem]);
 
-  // Cleanup wanneer de modal sluit of het component unmount
   useEffect(() => {
+    // Cleanup bij afsluiten of unmounten
     return () => {
       if (sound) {
         sound.unloadAsync();
@@ -87,6 +89,18 @@ export default function DemoModule({ visible, mediaItem, onClose }: DemoModulePr
     }
   };
 
+  const handlePlayPause = async () => {
+    await togglePlayPause();
+  };
+
+  const handleReplay = async () => {
+    if (!sound) return;
+    // Zet de positie op 0 en speel opnieuw
+    await (sound.setPositionAsync(0) || Promise.resolve());
+    await (sound.playAsync() || Promise.resolve());
+    setIsPlaying(true);
+  };
+
   const formatTime = (millis: number) => {
     const totalSeconds = Math.floor(millis / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -121,16 +135,36 @@ export default function DemoModule({ visible, mediaItem, onClose }: DemoModulePr
           <Image 
             source={{ uri: mediaItem.media_url }}
             style={styles.expandedMedia}
-            resizeMode="contain"
+            resizeMode="cover"
           />
-          {/* Audio controls */}
-          <View style={styles.audioControls}>
-            <TouchableOpacity onPress={togglePlayPause} style={styles.playPauseButton}>
-              <Text style={styles.playPauseText}>{isPlaying ? "Pause" : "Play"}</Text>
-            </TouchableOpacity>
-            <View style={styles.timeContainer}>
-              <Text style={styles.timeText}>{formatTime(position)}</Text>
-              <Text style={styles.timeText}>{formatTime(duration)}</Text>
+          {/* Controls Overlay */}
+          <View style={styles.controlsContainer}>
+            {/* Linkerkant: Play/Pause */}
+            <View style={styles.leftControls}>
+              <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
+            </View>
+            {/* Midden: Seekbar */}
+            <View style={styles.centerControls}>
+              <Slider
+                style={styles.slider}
+                minimumValue={0}
+                maximumValue={1}
+                value={duration ? position / duration : 0}
+                minimumTrackTintColor="#FFFFFF"
+                maximumTrackTintColor="#000000"
+                thumbTintColor="rgba(255, 255, 255, 0)"
+                onSlidingComplete={async (value: number) => {
+                  const newPosition = value * duration;
+                  // Check of sound bestaat voordat we de positie aanpassen
+                  if (sound) {
+                    await sound.setPositionAsync(newPosition);
+                  }
+                }}
+              />
+            </View>
+            {/* Rechts: Replay */}
+            <View style={styles.rightControls}>
+              <ReplayButton onPress={handleReplay} />
             </View>
           </View>
         </Animated.View>
@@ -150,6 +184,7 @@ const styles = StyleSheet.create({
   },
   expandedMediaContainer: {
     width: "90%",
+    height: 450,
     backgroundColor: "#000",
     borderRadius: 10,
     overflow: "hidden",
@@ -157,28 +192,46 @@ const styles = StyleSheet.create({
   },
   expandedMedia: {
     width: "100%",
-    height: "50%",
+    height: "100%",
+    
+
   },
-  audioControls: {
+  controlsContainer: {
+    position: "absolute",
+    bottom: 10,
+    left: 10,
+    right: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(0, 0, 0, 0)",
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  leftControls: {
+    width: 30,
+    height: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    bottom: 10,
+    right: 10
+  },
+  centerControls: {
+    flex: 1,
+    marginHorizontal: 5,
+    right: 2
+  },
+  slider: {
     width: "100%",
-    padding: 10,
-    backgroundColor: "#1E1E1E",
+    height: 20,
+  },
+  rightControls: {
+    width: 30,
+    height: 30,
+    justifyContent: "center",
     alignItems: "center",
   },
-  playPauseButton: {
-    marginBottom: 10,
-  },
-  playPauseText: {
-    color: "#A020F0",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  timeContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "90%",
-  },
-  timeText: {
-    color: "white",
-  },
 });
+
+

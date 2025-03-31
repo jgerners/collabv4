@@ -13,6 +13,8 @@ import { Video, ResizeMode, Audio } from "expo-av";
 import Slider from "@react-native-community/slider";
 import { useRoute } from "@react-navigation/native";
 import { supabase } from "../../supabaseClient";
+import PlayPause from "../../components/mainbuttons/play_pause";
+import ReplayButton from "../../components/mainbuttons/replay";
 
 const { width: windowWidth } = Dimensions.get("window");
 const scale = windowWidth / 370;
@@ -31,7 +33,22 @@ const DemoDetailScreen: React.FC = () => {
   const videoRef = useRef<Video | null>(null);
   const audioRef = useRef<Audio.Sound | null>(null);
 
-  // 🔄 Demo ophalen uit Supabase
+  const awaitOrIgnore = async (fn: () => Promise<any>) => {
+    try {
+      await fn();
+    } catch (error) {
+      console.error("Ignored error:", error);
+    }
+  };
+
+  const updatePlaybackStatus = (status: any) => {
+    if (status.isLoaded) {
+      setCurrentTime(status.positionMillis);
+      setDuration(status.durationMillis);
+    }
+  };
+
+  // Demo ophalen
   useEffect(() => {
     const fetchDemo = async () => {
       const { data, error } = await supabase
@@ -45,16 +62,15 @@ const DemoDetailScreen: React.FC = () => {
       } else {
         setDemo(data);
       }
-
       setLoading(false);
     };
 
     fetchDemo();
   }, [demoId]);
 
-  // Audio laden als het om een afbeelding met audio gaat
+  // Audio laden als het een afbeelding met audio betreft
   useEffect(() => {
-    if (demo?.media_url && demo?.audio_url && !demo.media_url.endsWith(".mp4")) {
+    if (demo && demo.audio_url && !demo.media_url.endsWith(".mp4")) {
       const loadAudio = async () => {
         try {
           const { sound } = await Audio.Sound.createAsync(
@@ -75,22 +91,16 @@ const DemoDetailScreen: React.FC = () => {
     }
   }, [demo]);
 
-  const updatePlaybackStatus = (status: any) => {
-    if (status.isLoaded) {
-      setCurrentTime(status.positionMillis);
-      setDuration(status.durationMillis);
-    }
-  };
-
   const handlePlayPause = async () => {
-    if (demo?.media_url.endsWith(".mp4") && videoRef.current) {
+    if (!demo) return;
+    if (demo.media_url.endsWith(".mp4") && videoRef.current) {
       if (isPlaying) {
         await videoRef.current.pauseAsync();
       } else {
         await videoRef.current.playAsync();
       }
       setIsPlaying(!isPlaying);
-    } else if (demo?.audio_url && audioRef.current) {
+    } else if (demo.audio_url && audioRef.current) {
       if (isPlaying) {
         await audioRef.current.pauseAsync();
       } else {
@@ -100,6 +110,39 @@ const DemoDetailScreen: React.FC = () => {
     }
   };
 
+  const handleReplay = async () => {
+    if (!demo) return;
+    if (demo.media_url.endsWith(".mp4") && videoRef.current) {
+      console.log(`Replaying video ${demo.id}`);
+      awaitOrIgnore(() => {
+        return videoRef.current 
+          ? videoRef.current.setPositionAsync(0)
+          : Promise.resolve();
+      });
+      awaitOrIgnore(() => {
+        return videoRef.current 
+          ? videoRef.current.playAsync()
+          : Promise.resolve();
+      });
+      setIsPlaying(true);
+   
+    } else if (demo.audio_url && audioRef.current) {
+      console.log(`Replaying audio for demo ${demo.id}`);
+      awaitOrIgnore(() => {
+        return audioRef.current 
+          ? audioRef.current.setPositionAsync(0)
+          : Promise.resolve();
+      });
+      awaitOrIgnore(() => {
+        return audioRef.current 
+          ? audioRef.current.playAsync()
+          : Promise.resolve();
+      });
+      setIsPlaying(true);
+    }
+  };
+
+ 
   if (loading || !demo) {
     return (
       <View style={styles.loadingContainer}>
@@ -120,34 +163,43 @@ const DemoDetailScreen: React.FC = () => {
             shouldPlay={false}
             isLooping
             onPlaybackStatusUpdate={updatePlaybackStatus}
+            useNativeControls={false}
           />
         ) : (
           <Image source={{ uri: demo.media_url }} style={styles.media} />
         )}
+        {/* Controls Overlay */}
+        <View style={styles.controlsContainer}>
+          {/* Linkerkant: Play/Pause */}
+          <View style={styles.leftControls}>
+            <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
+          </View>
+          {/* Midden: Seekbar */}
+          <View style={styles.centerControls}>
+            <Slider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={1}
+              value={duration ? currentTime / duration : 0}
+              minimumTrackTintColor="#FFFFFF"
+              maximumTrackTintColor="#000000"
+              thumbTintColor="#FFFFFF"
+              onSlidingComplete={async (value: number) => {
+                const newPosition = value * duration;
+                if (demo.media_url.endsWith(".mp4") && videoRef.current) {
+                  await videoRef.current.setPositionAsync(newPosition);
+                } else if (demo.audio_url && audioRef.current) {
+                  await audioRef.current.setPositionAsync(newPosition);
+                }
+              }}
+            />
+          </View>
+          {/* Rechts: Replay */}
+          <View style={styles.rightControls}>
+            <ReplayButton onPress={handleReplay} />
+          </View>
+        </View>
       </Pressable>
-
-      <View style={styles.controlsContainer}>
-        <TouchableOpacity onPress={handlePlayPause} style={styles.playPauseButton}>
-          <Text style={styles.playPauseText}>{isPlaying ? "Pause" : "Play"}</Text>
-        </TouchableOpacity>
-        <Slider
-          style={styles.slider}
-          minimumValue={0}
-          maximumValue={1}
-          value={duration ? currentTime / duration : 0}
-          minimumTrackTintColor="#FFFFFF"
-          maximumTrackTintColor="#000000"
-          thumbTintColor="#FFFFFF"
-          onSlidingComplete={async (value: number) => {
-            const newPosition = value * duration;
-            if (demo.media_url.endsWith(".mp4") && videoRef.current) {
-              await videoRef.current.setPositionAsync(newPosition);
-            } else if (demo.audio_url && audioRef.current) {
-              await audioRef.current.setPositionAsync(newPosition);
-            }
-          }}
-        />
-      </View>
     </View>
   );
 };
@@ -164,23 +216,39 @@ const styles = StyleSheet.create({
   },
   media: { width: "100%", height: "100%" },
   controlsContainer: {
+    position: "absolute",
+    bottom: scale * 2,
+    left: scale * 10,
+    right: scale * 10,
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
+    justifyContent: "space-between",
+    backgroundColor: "rgba(0,0,0,0.3)",
+    borderRadius: scale * 5,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
   },
-  playPauseButton: {
-    padding: 10,
-    backgroundColor: "#A020F0",
-    borderRadius: 5,
-    marginRight: 10,
+  leftControls: {
+    // Pas eventueel de grootte van de play/pause-knop aan
+    width: scale * 30,
+    height: scale * 30,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  playPauseText: {
-    color: "white",
-    fontSize: 16,
+  centerControls: {
+    flex: 1,
+    marginHorizontal: 5,
   },
   slider: {
-    width: scale * 200,
-    height: 40,
+    width: "100%",
+    height: scale * 20,
+  },
+  rightControls: {
+    // Zorg dat de replay-knop dezelfde grootte heeft als in je PostComponent
+    width: scale * 30,
+    height: scale * 30,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 
