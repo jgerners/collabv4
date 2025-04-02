@@ -22,11 +22,13 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center", // Centreert de inhoud verticaal
         marginRight: 8,
-        backgroundColor: "#444",
+        backgroundColor: "#121212",
         paddingHorizontal: 5,
         paddingVertical: 2,
         borderRadius: 10,
         marginVertical: 4,
+        borderWidth: 1,               // Dunne rand
+        borderColor: "white",         // Witte rand
       },
       text: {
         fontSize: 12,

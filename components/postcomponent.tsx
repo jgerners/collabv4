@@ -50,6 +50,8 @@ export interface PostData {
   userId: string;
   profileImage: string;
   username: string;
+  display_name: string;
+  role: string;
   media: string | number;
   mediaUrl?: string | number;
   mediaType?: "image" | "video" | "photo";
@@ -73,11 +75,13 @@ interface PostProps {
 }
 
 const PostComponent: React.FC<PostProps> = ({
+  
   post,
   isActive,
   artistTags,
   genreTags,
 }) => {
+  console.log("Post data:", post);
   const { user } = useAuth();
   const currentUserId = user?.id;
   const [followed, setFollowed] = useState(post.isFollowed);
@@ -264,31 +268,37 @@ const PostComponent: React.FC<PostProps> = ({
   return (
     <View style={styles.postContainer}>
       {/* Post Header */}
-      <View style={styles.postHeader}>
-        <View style={styles.profileContainer}>
-          <ProfileLink userId={post.userId}>
-            <Image
-              source={{ uri: post.profileImage }}
-              style={{
-                width: scale * 30,
-                height: scale * 30,
-                borderRadius: scale * 15,
-              }}
-            />
-          </ProfileLink>
-          <ProfileLink userId={post.userId}>
-            <Text style={styles.usernameText}>{post.username}</Text>
-          </ProfileLink>
-        </View>
-        <View style={styles.headerButtons}>
-          {currentUserId && (
-            <Like postId={post.id} userId={currentUserId} receiverId={post.userId} />
-          )}
-          {currentUserId && (
-            <Follow followerId={currentUserId} followingId={post.userId} />
-          )}
-        </View>
+<View style={styles.postHeader}>
+  <View style={styles.profileContainer}>
+    <ProfileLink userId={post.userId}>
+      <Image
+        source={{ uri: post.profileImage }}
+        style={{
+          width: scale * 30,
+          height: scale * 30,
+          borderRadius: scale * 15,
+        }}
+      />
+    </ProfileLink>
+    <ProfileLink userId={post.userId}>
+      <View style={styles.userInfo}>
+        <Text style={styles.usernameText}>{post.username}</Text>
+        <Text style={styles.displayNameText}>
+          {post.display_name} <Text style={styles.dot}>•</Text> {post.role}
+        </Text>
       </View>
+    </ProfileLink>
+  </View>
+  <View style={styles.headerButtons}>
+    {currentUserId && (
+      <Like postId={post.id} userId={currentUserId} receiverId={post.userId} />
+    )}
+    {currentUserId && (
+      <Follow followerId={currentUserId} followingId={post.userId} />
+    )}
+  </View>
+</View>
+
 
       {/* Media Container */}
       <Pressable onPress={handlePlayPause} style={styles.mediaContainer}>
@@ -424,16 +434,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  userInfo: {
+    marginLeft: scale * 5,
+  },
   usernameText: {
     color: "white",
     fontSize: scale * 12,
     fontWeight: "bold",
-    marginLeft: scale * 5,
   },
+  displayNameText: {
+    color: "white",
+    fontSize: scale * 10, // kleiner dan de username
+  },
+  dot: {
+    marginHorizontal: scale * 3,
+  },
+
   headerButtons: {
     flexDirection: "row",
     alignItems: "center",
   },
+
   mediaContainer: {
     width: scale * 345,
     borderRadius: scale * 10,

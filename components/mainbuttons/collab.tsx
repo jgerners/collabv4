@@ -3,6 +3,9 @@ import { Animated, TouchableOpacity, Text, StyleSheet, Easing } from "react-nati
 import { supabase } from "../../supabaseClient";
 import { LinearGradient } from "expo-linear-gradient";
 
+import {useFonts} from 'expo-font';
+
+
 interface CollabProps {
   senderId: string;
   receiverId: string;
@@ -11,6 +14,11 @@ interface CollabProps {
 
 const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
   const [status, setStatus] = useState<"none" | "pending" | "accepted" | "rejected">("none");
+
+  const [fontsLoaded] = useFonts({
+    'Oswald-Regular': require('../../assets/fonts/Oswald-VariableFont_wght.ttf'),
+  }); 
+
 
   // Realtime abonnement voor status updates
   useEffect(() => {
@@ -103,6 +111,11 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
     outputRange: [0, 1],
   });
 
+  if (!fontsLoaded) {
+    return null;
+  }
+
+  
   const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
   return (
@@ -129,16 +142,22 @@ const styles = StyleSheet.create({
   },
   collabButton: {
     padding: 5,
-    borderRadius: 15,
+    borderRadius: 12,
     height: 30,
     width: 100,
     alignItems: "center",
     justifyContent: "center",
+    
+   
+    
   },
   collabText: {
     color: "white",
-    fontSize: 16,
+    fontSize: 18,
     textAlign: "center",
+    fontFamily: 'Oswald-VariableFont_wght',
+    fontWeight: 'bold',
+    bottom: 1
   },
 });
 

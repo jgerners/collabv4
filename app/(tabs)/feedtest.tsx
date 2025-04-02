@@ -73,6 +73,8 @@ const FeedScreen: React.FC = () => {
               ...item,
               userId: item.userId,
               username: item.username || "Onbekend",
+              display_name: item.display_name,
+              role: item.role,
               profileImage: item.profileImage || "https://via.placeholder.com/50",
               artistTags: item.artistTags ?? [],
               genreTags: item.genreTags ?? [],

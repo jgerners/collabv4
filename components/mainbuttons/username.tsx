@@ -10,6 +10,8 @@ const Username: React.FC<UsernameProps> = ({ name }) => {
   return <Text style={styles.username}>{name}</Text>;
 };
 
+
+
 const styles = StyleSheet.create({
   username: {
     marginLeft: 10,

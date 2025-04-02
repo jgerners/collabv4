@@ -31,6 +31,7 @@ const Like: React.FC<LikeProps> = ({ postId, userId, receiverId }) => {
 const styles = StyleSheet.create({
   likeButton: {
     marginRight: 10,
+    
   },
 });
 

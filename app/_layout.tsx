@@ -38,7 +38,7 @@ function TabsLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: true,
         headerTransparent: true,
-        headerStyle: { height: 110 },
+        headerStyle: { height: 110, },
         headerBackground: () => (
           <BlurView intensity={50} tint="dark" style={styles.headerBackground} />
         ),

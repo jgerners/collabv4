@@ -8,6 +8,8 @@ export interface Post {
   userId: string;
   profileImage: string;
   username: string;
+  display_name: string; 
+  role: string;
   media: string | number;
   mediaUrl: string | number;
   mediaType: "photo" | "video";
@@ -49,7 +51,7 @@ export const usePosts = () => {
         isFollowed,
         isSaved,
         isPlaying,
-        profiles(username, profile_pic)
+        profiles(username, profile_pic, display_name, role)
       `)
       .order("timestamp", { ascending: false });
 
@@ -65,6 +67,8 @@ export const usePosts = () => {
         userId: post.userId,
         profileImage: post.profiles?.profile_pic || "https://via.placeholder.com/50",
         username: post.profiles?.username || "Onbekend",
+        display_name: post.profiles?.display_name,
+        role: post.profiles?.role,
         media: post.media,
         mediaUrl: post.mediaUrl,
         mediaType: post.mediaType,

@@ -16,11 +16,13 @@ const Follow: React.FC<FollowProps> = ({ followerId, followingId }) => {
   }
 
   return (
-    <TouchableOpacity style={styles.followBubble} onPress={toggleFollow}>
-      <Text style={styles.followBubbleText}>
+    <TouchableOpacity
+      style={[styles.followBubble, isFollowing ? styles.following : styles.notFollowing]} // Dynamisch de stijl toepassen
+      onPress={toggleFollow}
+    >
+      <Text style={[styles.followBubbleText, isFollowing ? styles.followingText : styles.notFollowingText]}>
         {isFollowing ? "Following" : "Follow"}
       </Text>
-      {/* Indien gewenst, kun je eventueel ook de foutmelding weergeven */}
       {error && <Text style={styles.errorText}>{error}</Text>}
     </TouchableOpacity>
   );
@@ -28,14 +30,30 @@ const Follow: React.FC<FollowProps> = ({ followerId, followingId }) => {
 
 const styles = StyleSheet.create({
   followBubble: {
-    backgroundColor: "#6A0DAD",
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 15,
+    borderRadius: 12,
   },
   followBubbleText: {
     color: "white",
     fontSize: 14,
+  },
+  // Toevoeging van nieuwe stijlen
+  following: {
+    backgroundColor: "#121212", // Paars
+    borderWidth: 1,               // Dunne rand
+    borderColor: "white",         // Witte rand
+  },
+  followingText: {
+    color: "white",  // Witte tekst
+  },
+  notFollowing: {
+    backgroundColor: "#121212",  // Zwarte achtergrond zoals de post
+    borderWidth: 1,               // Dunne rand
+    borderColor: "white",         // Witte rand
+  },
+  notFollowingText: {
+    color: "white",  // Witte tekst als je niet volgt
   },
   errorText: {
     color: "red",
