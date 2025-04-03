@@ -75,7 +75,6 @@ interface PostProps {
 }
 
 const PostComponent: React.FC<PostProps> = ({
-  
   post,
   isActive,
   artistTags,
@@ -84,7 +83,6 @@ const PostComponent: React.FC<PostProps> = ({
   console.log("Post data:", post);
   const { user } = useAuth();
   const currentUserId = user?.id;
-  const [followed, setFollowed] = useState(post.isFollowed);
   const [isPlaying, setIsPlaying] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [manualPaused, setManualPaused] = useState(false);
@@ -122,7 +120,6 @@ const PostComponent: React.FC<PostProps> = ({
 
   // EFFECT 1: Reactie op scroll- (isActive) en focus samen (bij mount en scroll)
   useEffect(() => {
-    // Alleen wanneer het scherm gefocust is (anders kan auto-play al gepauzeerd worden)
     if (isFocused) {
       if (isActive) {
         if (!manualPaused && !isPlaying) {
@@ -153,7 +150,6 @@ const PostComponent: React.FC<PostProps> = ({
           }
         }
       } else {
-        // Als de post niet actief is, pauzeer en reset de media (bij scroll)
         if (post.mediaType === "video" && videoRef.current) {
           console.log(`Auto-pausing video ${post.id} (scroll)`);
           awaitOrIgnore(() => videoRef.current!.pauseAsync());
@@ -174,7 +170,6 @@ const PostComponent: React.FC<PostProps> = ({
   // EFFECT 2: Reactie op navigatiefocus (isFocused) los van scroll
   useEffect(() => {
     if (!isFocused) {
-      // Sla op of er aan het spelen was vóór focusverlies
       wasPlayingBeforeFocusLoss.current = isPlaying;
       console.log(`Screen lost focus - pausing media for post ${post.id}`);
       if (post.mediaType === "video" && videoRef.current) {
@@ -184,7 +179,6 @@ const PostComponent: React.FC<PostProps> = ({
       }
       setIsPlaying(false);
     } else {
-      // Als het scherm weer gefocust is, hervat de media als die vóór focusverlies speelde
       if (wasPlayingBeforeFocusLoss.current && !manualPaused && !isPlaying) {
         console.log(`Screen refocused - resuming media for post ${post.id}`);
         if (post.mediaType === "video" && videoRef.current) {
@@ -268,37 +262,49 @@ const PostComponent: React.FC<PostProps> = ({
   return (
     <View style={styles.postContainer}>
       {/* Post Header */}
-<View style={styles.postHeader}>
-  <View style={styles.profileContainer}>
-    <ProfileLink userId={post.userId}>
-      <Image
-        source={{ uri: post.profileImage }}
-        style={{
-          width: scale * 30,
-          height: scale * 30,
-          borderRadius: scale * 15,
-        }}
-      />
-    </ProfileLink>
-    <ProfileLink userId={post.userId}>
-      <View style={styles.userInfo}>
-        <Text style={styles.usernameText}>{post.username}</Text>
-        <Text style={styles.displayNameText}>
-          {post.display_name} <Text style={styles.dot}>•</Text> {post.role}
-        </Text>
+      <View style={styles.postHeader}>
+        <View style={styles.profileContainer}>
+          <ProfileLink userId={post.userId}>
+            <Image
+              source={{ uri: post.profileImage }}
+              style={{
+                width: scale * 30,
+                height: scale * 30,
+                borderRadius: scale * 15,
+              }}
+            />
+          </ProfileLink>
+          <ProfileLink userId={post.userId}>
+            <View style={styles.userInfo}>
+              <Text style={styles.usernameText}>{post.username}</Text>
+              <Text style={styles.displayNameText}>
+                {post.display_name} <Text style={styles.dot}>•</Text> {post.role}
+              </Text>
+            </View>
+          </ProfileLink>
+        </View>
+        {/* In de header komt nu de tags (rechtsboven) */}
+        <View style={styles.headerTags}>
+          <View style={styles.artistTagsContainerHeader}>
+            {post.artistTags?.map((tagId, index) => {
+              const foundTag = artistTags.find((tag) => tag.id === tagId);
+              return foundTag ? (
+                <View key={foundTag.id} style={{ marginLeft: index === 0 ? 0 : -10 }}>
+                  <ArtistTag id={foundTag.id} name={foundTag.name} image={foundTag.image} />
+                </View>
+              ) : null;
+            })}
+          </View>
+          <View style={styles.genreTagsContainerHeader}>
+            {post.genreTags?.map((tagId, index) => {
+              const foundTag = genreTags.find((tag) => tag.id === tagId);
+              return foundTag ? (
+                <GenreTag key={foundTag.id} id={foundTag.id} name={foundTag.name} />
+              ) : null;
+            })}
+          </View>
+        </View>
       </View>
-    </ProfileLink>
-  </View>
-  <View style={styles.headerButtons}>
-    {currentUserId && (
-      <Like postId={post.id} userId={currentUserId} receiverId={post.userId} />
-    )}
-    {currentUserId && (
-      <Follow followerId={currentUserId} followingId={post.userId} />
-    )}
-  </View>
-</View>
-
 
       {/* Media Container */}
       <Pressable onPress={handlePlayPause} style={styles.mediaContainer}>
@@ -345,7 +351,6 @@ const PostComponent: React.FC<PostProps> = ({
               }}
             />
           </View>
-          {/* Gebruik het ReplayButton-component */}
           <ReplayButton onPress={handleReplay} />
         </View>
 
@@ -378,37 +383,25 @@ const PostComponent: React.FC<PostProps> = ({
         </View>
       </Pressable>
 
-      {/* Tags */}
-      <View style={styles.tagsContainer}>
-        <View style={styles.artistTagsContainer}>
-          {post.artistTags?.map((tagId, index) => {
-            const foundTag = artistTags.find((tag) => tag.id === tagId);
-            return foundTag ? (
-              <View key={foundTag.id} style={{ marginLeft: index === 0 ? 0 : -10 }}>
-                <ArtistTag id={foundTag.id} name={foundTag.name} image={foundTag.image} />
-              </View>
-            ) : null;
-          })}
+      {/* Onderste container: like/follow links en collab rechts */}
+      <View style={styles.bottomContainer}>
+        <View style={styles.bottomButtons}>
+          {currentUserId && (
+            <Like postId={post.id} userId={currentUserId} receiverId={post.userId} />
+          )}
+          {currentUserId && (
+            <Follow followerId={currentUserId} followingId={post.userId} />
+          )}
         </View>
-        <View style={styles.genreTagsContainer}>
-          {post.genreTags?.map((tagId, index) => {
-            const foundTag = genreTags.find((tag) => tag.id === tagId);
-            return foundTag ? (
-              <GenreTag key={foundTag.id} id={foundTag.id} name={foundTag.name} />
-            ) : null;
-          })}
+        <View style={styles.postActions}>
+          {currentUserId ? (
+            <Collab senderId={currentUserId} receiverId={post.userId} postId={post.id} />
+          ) : (
+            <TouchableOpacity style={styles.collabButtonDisabled} disabled={true}>
+              <Text style={styles.collabText}>LOGIN TO COLLAB!</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      </View>
-
-      {/* Collab Button */}
-      <View style={styles.postActions}>
-        {currentUserId ? (
-          <Collab senderId={currentUserId} receiverId={post.userId} postId={post.id} />
-        ) : (
-          <TouchableOpacity style={styles.collabButtonDisabled} disabled={true}>
-            <Text style={styles.collabText}>LOGIN TO COLLAB!</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </View>
   );
@@ -444,17 +437,26 @@ const styles = StyleSheet.create({
   },
   displayNameText: {
     color: "white",
-    fontSize: scale * 10, // kleiner dan de username
+    fontSize: scale * 10,
   },
   dot: {
     marginHorizontal: scale * 3,
   },
-
-  headerButtons: {
+  // Nieuwe stijl voor de header tags (rechtsboven)
+  headerTags: {
     flexDirection: "row",
     alignItems: "center",
   },
-
+  artistTagsContainerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  genreTagsContainerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: scale * 5,
+    left: scale * 5,
+  },
   mediaContainer: {
     width: scale * 345,
     borderRadius: scale * 10,
@@ -522,27 +524,21 @@ const styles = StyleSheet.create({
     marginTop: scale * 4,
     textDecorationLine: "underline",
   },
-  tagsContainer: {
+  // Nieuwe onderste container met like/follow links en collab rechts
+  bottomContainer: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
     marginTop: scale * 10,
     paddingHorizontal: scale * 10,
-    right: scale * 10
   },
-  artistTagsContainer: {
+  bottomButtons: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  genreTagsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginLeft: scale * 20,
+    right: scale * 12,
   },
   postActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginTop: scale * -28,
-    left: scale * 10
+    left: scale * 18,
   },
   collabButtonDisabled: {},
   collabText: {},

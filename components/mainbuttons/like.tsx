@@ -21,7 +21,7 @@ const Like: React.FC<LikeProps> = ({ postId, userId, receiverId }) => {
     <TouchableOpacity onPress={toggleLike} style={styles.likeButton}>
       <Icon
         name={liked ? "heart" : "heart-outline"}
-        size={25}
+        size={30}
         color={liked ? "red" : "white"}
       />
     </TouchableOpacity>
@@ -31,6 +31,7 @@ const Like: React.FC<LikeProps> = ({ postId, userId, receiverId }) => {
 const styles = StyleSheet.create({
   likeButton: {
     marginRight: 10,
+  
     
   },
 });
