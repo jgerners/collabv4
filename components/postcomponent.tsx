@@ -11,13 +11,12 @@ import {
   UIManager,
   Platform,
   LayoutAnimation,
+  ActivityIndicator,
 } from "react-native";
 import { Video, ResizeMode, Audio } from "expo-av";
-import { useIsFocused } from "@react-navigation/native";
 import { useAuth } from "../context/authContext";
 import Slider from "@react-native-community/slider";
-
-import { useFocusEffect } from "@react-navigation/native";
+import { useMediaPreload } from "../context/MediaPreloadContext";
 
 import ProfileLink from "./profileLink";
 import Like from "./mainbuttons/like";
@@ -74,18 +73,20 @@ interface PostProps {
   post: PostData;
   artistTags: ArtistTagData[];
   genreTags: GenreTagData[];
-  isActive: boolean; // Geeft aan of de post via scroll automatisch moet afspelen
+  isActive: boolean;    // Geeft aan of de post via scroll automatisch moet afspelen
+  feedFocused: boolean; // Geeft aan of de feed (en dus het scherm) in focus is
+  withinPreloadRange: boolean; // nieuwe prop
 }
-
-// ... (import statements en overige code blijven ongewijzigd)
 
 const PostComponent: React.FC<PostProps> = ({
   post,
   isActive,
   artistTags,
   genreTags,
+  feedFocused,
+  withinPreloadRange
 }) => {
-  console.debug("[DEBUG] PostComponent init for post:", post.id);
+
 
   const { user } = useAuth();
   const currentUserId = user?.id;
@@ -93,6 +94,8 @@ const PostComponent: React.FC<PostProps> = ({
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [manualPaused, setManualPaused] = useState(false);
   const [showSeeMore, setShowSeeMore] = useState(false);
+  // State voor de loading-indicator bij audio-loading
+  const [audioLoading, setAudioLoading] = useState(false);
 
   // Animated waarde voor de header-tags
   const toggleAnim = useRef(new Animated.Value(0)).current;
@@ -122,20 +125,16 @@ const PostComponent: React.FC<PostProps> = ({
 
   const videoRef = useRef<Video | null>(null);
   const audioRef = useRef<Audio.Sound | null>(null);
+  const { getPreloadedAudio } = useMediaPreload();
 
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-
-  const isFocused = useIsFocused();
-  const wasPlayingBeforeFocusLoss = useRef(false);
-
-  
 
   const awaitOrIgnore = async (fn: () => Promise<any>) => {
     try {
       await fn();
     } catch (error) {
-      console.error("[DEBUG] awaitOrIgnore error:", error);
+
     }
   };
 
@@ -143,7 +142,6 @@ const PostComponent: React.FC<PostProps> = ({
     if (status.isLoaded) {
       setCurrentTime(status.positionMillis);
       setDuration(status.durationMillis);
-      
     }
   };
 
@@ -152,107 +150,114 @@ const PostComponent: React.FC<PostProps> = ({
     setDescriptionExpanded(!descriptionExpanded);
   };
 
- // EFFECT 1: Reactie op scroll- (isActive) en focus samen (bij mount en scroll)
- useEffect(() => {
-  if (isFocused) {
-    if (isActive) {
-      if (!manualPaused && !isPlaying) {
+  // Helper: retry-mechanisme voor preloaded audio
+  const retryPlayAudio = async (sound: Audio.Sound, retries: number = 3): Promise<void> => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const status = await sound.getStatusAsync();
+        if (status.isLoaded) {
+          await sound.playAsync();
+          return;
+        }
+      } catch (error) {
+
+      }
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+  };
+
+  // Helper: speel preloaded audio met status-check en retry
+  const playPreloadedAudio = async (sound: Audio.Sound) => {
+    try {
+      const status = await sound.getStatusAsync();
+      if (status.isLoaded) {
+        await sound.playAsync();
+      } else {
+
+        await retryPlayAudio(sound);
+      }
+    } catch (error) {
+
+    }
+  };
+
+  // Zorg dat voor video altijd de onPlaybackStatusUpdate-callback is ingesteld
+  useEffect(() => {
+    if (post.mediaType === "video" && videoRef.current) {
+      videoRef.current.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+    }
+  }, [post.mediaType]);
+
+  // Nieuwe useEffect: automatische afspeel-/pauze-logica met gescheiden logica voor auto en manual
+  useEffect(() => {
+    if (isActive && feedFocused) {
+      if (!manualPaused) {
         if (post.mediaType === "video" && videoRef.current) {
-          console.log(`Auto-playing video ${post.id} from beginning (scroll)`);
-          awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
           awaitOrIgnore(() => videoRef.current!.playAsync());
           setIsPlaying(true);
         } else if (post.mediaType === "photo" && post.audio) {
-          if (!audioRef.current) {
-            const handleAudio = async () => {
-              console.log(`Auto-loading and playing audio for post ${post.id} from beginning (scroll)`);
+          setAudioLoading(true);
+          const preloadedAudio = getPreloadedAudio(post.id);
+          if (preloadedAudio) {
+            audioRef.current = preloadedAudio;
+            preloadedAudio.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+            awaitOrIgnore(() => playPreloadedAudio(preloadedAudio));
+            setIsPlaying(true);
+            setAudioLoading(false);
+          } else {
+            const playAudio = async () => {
               try {
                 const audioUri = typeof post.audio === "string" ? post.audio : post.audio!.toString();
-                const { sound } = await Audio.Sound.createAsync(
-                  { uri: audioUri },
-                  { shouldPlay: true }
-                );
+                const { sound } = await Audio.Sound.createAsync({ uri: audioUri }, { shouldPlay: true });
                 audioRef.current = sound;
                 setIsPlaying(true);
                 sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
               } catch (error) {
-                console.error("Error auto-loading audio:", error);
+                // Foutafhandeling
               }
+              setAudioLoading(false);
             };
-            handleAudio();
+            playAudio();
           }
         }
       }
     } else {
+      // Deze else-logica is verantwoordelijk voor wat er gebeurt wanneer de post niet (meer) actief is.
       if (post.mediaType === "video" && videoRef.current) {
-        console.log(`Auto-pausing video ${post.id} (scroll)`);
         awaitOrIgnore(() => videoRef.current!.pauseAsync());
         awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
         setIsPlaying(false);
       } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
-        console.log(`Auto-stopping and unloading audio for post ${post.id} (scroll)`);
-        awaitOrIgnore(() => audioRef.current!.stopAsync());
-        awaitOrIgnore(() => audioRef.current!.unloadAsync());
-        audioRef.current = null;
+        if (withinPreloadRange) {
+          // Binnen preload-window: eerst naar 0,dan pauzeren en NIET unloaden
+          awaitOrIgnore(() => audioRef.current!.setPositionAsync(0));
+          awaitOrIgnore(() => audioRef.current!.pauseAsync());
+        } else {
+          // Buiten preload-window: stop en unload de media
+          awaitOrIgnore(() => audioRef.current!.stopAsync());
+          awaitOrIgnore(() => audioRef.current!.unloadAsync());
+          audioRef.current = null;
+        }
         setIsPlaying(false);
       }
-      setManualPaused(false);
     }
-  }
-}, [isActive, isFocused]);
+  }, [isActive, feedFocused, manualPaused, withinPreloadRange]);
+  
 
-// EFFECT 2: Reactie op navigatiefocus (isFocused) los van scroll
-useEffect(() => {
-  if (!isFocused) {
-    wasPlayingBeforeFocusLoss.current = isPlaying;
-    console.log(`Screen lost focus - pausing media for post ${post.id}`);
-    if (post.mediaType === "video" && videoRef.current) {
-      awaitOrIgnore(() => videoRef.current!.pauseAsync());
-    } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
-      awaitOrIgnore(() => audioRef.current!.pauseAsync());
-    }
-    setIsPlaying(false);
-  } else {
-    if (wasPlayingBeforeFocusLoss.current && !manualPaused && !isPlaying) {
-      console.log(`Screen refocused - resuming media for post ${post.id}`);
-      if (post.mediaType === "video" && videoRef.current) {
-        awaitOrIgnore(() => videoRef.current!.playAsync());
-        setIsPlaying(true);
-      } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
-        awaitOrIgnore(() => audioRef.current!.playAsync());
-        setIsPlaying(true);
-      }
-    }
-    wasPlayingBeforeFocusLoss.current = false;
-  }
-}, [isFocused]);
-
-useEffect(() => {
-  if (!isActive && manualPaused) {
-    setManualPaused(false);
-  }
-}, [isActive]);
-
-useEffect(() => {
-  if (post.mediaType === "video" && videoRef.current) {
-    videoRef.current.setOnPlaybackStatusUpdate(updatePlaybackStatus);
-  }
-}, [post.mediaType]);
-
-
-  // Handmatige play/pause functie
+  // Handmatige play/pause functie: als gebruiker actief pauzeert/hervat, dan reset je niet de positie
   const handlePlayPause = async () => {
     if (post.mediaType === "video" && videoRef.current) {
       if (isPlaying) {
         await videoRef.current.pauseAsync();
         setIsPlaying(false);
         setManualPaused(true);
-        console.debug("[DEBUG] Manual pause video for post:", post.id);
+    
       } else {
         await videoRef.current.playAsync();
         setIsPlaying(true);
         setManualPaused(false);
-        console.debug("[DEBUG] Manual resume video for post:", post.id);
+      
       }
     } else if (post.mediaType === "photo" && post.audio) {
       if (audioRef.current) {
@@ -260,37 +265,37 @@ useEffect(() => {
           try {
             await audioRef.current.pauseAsync();
           } catch (error) {
-            console.error("[DEBUG] Manual pause audio error for post:", post.id, error);
+         
           }
           setIsPlaying(false);
           setManualPaused(true);
-          console.debug("[DEBUG] Manual pause audio for post:", post.id);
+      
         } else {
           try {
             await audioRef.current.playAsync();
           } catch (error) {
-            console.error("[DEBUG] Manual resume audio error for post:", post.id, error);
+    
           }
           setIsPlaying(true);
           setManualPaused(false);
-          console.debug("[DEBUG] Manual resume audio for post:", post.id);
+          
         }
       }
     }
   };
 
-  // Replay functie
+  // Replay functie: reset de positie EN speel opnieuw
   const handleReplay = async () => {
     if (post.mediaType === "video" && videoRef.current) {
       awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
       awaitOrIgnore(() => videoRef.current!.playAsync());
       setIsPlaying(true);
-      console.debug("[DEBUG] Replay video for post:", post.id);
+      
     } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
       awaitOrIgnore(() => audioRef.current!.setPositionAsync(0));
       awaitOrIgnore(() => audioRef.current!.playAsync());
       setIsPlaying(true);
-      console.debug("[DEBUG] Replay audio for post:", post.id);
+      
     }
   };
 
@@ -370,6 +375,14 @@ useEffect(() => {
         ) : (
           <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
         )}
+
+        {/* Spinner overlay in het midden van de media container */}
+        {audioLoading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="white" />
+          </View>
+        )}
+
         <View style={styles.controlsContainer}>
           <View style={styles.playButtonContainer}>
             <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
@@ -395,7 +408,7 @@ useEffect(() => {
                     setIsPlaying(true);
                   }
                 }
-                console.debug("[DEBUG] Slider onSlidingComplete for post:", post.id, "newPosition:", newPosition);
+                
               }}
             />
           </View>
@@ -521,6 +534,16 @@ const styles = StyleSheet.create({
   media: {
     width: "100%",
     height: "100%",
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 2,
   },
   controlsContainer: {
     position: "absolute",
