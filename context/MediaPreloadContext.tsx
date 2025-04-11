@@ -41,27 +41,27 @@ export const MediaPreloadProvider: React.FC<React.PropsWithChildren<{}>> = ({ ch
     const start = Math.max(0, activeIndex - 4);
     const end = Math.min(posts.length - 1, activeIndex + 4);
 
-    console.debug(`[Preload] Preloading posts van index ${start} tot ${end} (activeIndex: ${activeIndex})`);
+   
 
     for (let i = start; i <= end; i++) {
       const post = posts[i];
-      console.debug(`[Preload] Check post ${post.id} (index ${i})`);
+      
 
       // Preload audio voor foto+audio posts.
       if (post.mediaType === "photo" && post.audio) {
         if (!mediaCache[post.id]?.audio) {
           try {
             const audioUri = typeof post.audio === "string" ? post.audio : post.audio.toString();
-            console.debug(`[Preload] Laden van audio voor post ${post.id} (${audioUri})`);
+         
             const { sound } = await Audio.Sound.createAsync(
               { uri: audioUri },
               { shouldPlay: false }
             );
             setMediaCache((prev) => ({ ...prev, [post.id]: { ...prev[post.id], audio: sound } }));
     
-            console.debug(`[Preload] Audio voor post ${post.id} succesvol ingeladen.`);
+           
           } catch (error) {
-            console.error(`Fout bij preload audio voor post ${post.id}:`, error);
+            
           }
         }
       }
@@ -72,13 +72,13 @@ export const MediaPreloadProvider: React.FC<React.PropsWithChildren<{}>> = ({ ch
           try {
             // Een simpele techniek: doe een fetch zodat de video-URI door de native/HTTP-cache kan worden opgewarmd.
             const videoUri = post.mediaUrl.toString();
-            console.debug(`[Preload] Warming up video voor post ${post.id} (${videoUri})`);
+          
             await fetch(videoUri);
             // Markeer dat deze video "opgewarmd" is.
             setMediaCache((prev) => ({ ...prev, [post.id]: { ...prev[post.id], videoPreloaded: true } }));
-            console.debug(`[Preload] Video voor post ${post.id} succesvol opgewarmd.`);
+          
           } catch (error) {
-            console.error(`Fout bij preload video voor post ${post.id}:`, error);
+  
           }
         }
       }
@@ -103,7 +103,7 @@ export const MediaPreloadProvider: React.FC<React.PropsWithChildren<{}>> = ({ ch
       try {
         await entry.audio.unloadAsync();
       } catch (error) {
-        console.error(`Fout bij het vrijgeven van audio voor post ${postId}:`, error);
+      
       }
     }
     // We verwijderen zowel audio als het videoPreloaded vlagje.

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 
-// Definieer de interface voor een Post
 export interface Post {
   [x: string]: any;
   id: string;
@@ -25,14 +24,17 @@ export interface Post {
   isPlaying: boolean;
 }
 
+const PAGE_SIZE = 20;
+
 export const usePosts = () => {
   const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState<number>(1);
 
-  const fetchPosts = async () => {
-    setLoading(true);
-    console.log("🔄 fetchPosts() wordt aangeroepen...");
+  const fetchPostsForPage = async (pageNumber: number): Promise<Post[]> => {
+    console.log(`🔄 fetchPosts() wordt aangeroepen voor pagina ${pageNumber}...`);
     const { data, error } = await supabase
       .from("posts")
       .select(`
@@ -53,15 +55,15 @@ export const usePosts = () => {
         isPlaying,
         profiles(username, profile_pic, display_name, role)
       `)
-      .order("timestamp", { ascending: false });
+      .order("timestamp", { ascending: false })
+      .range((pageNumber - 1) * PAGE_SIZE, pageNumber * PAGE_SIZE - 1);
 
     if (error) {
       console.error("❌ Fout bij ophalen posts:", error);
-      setError(error.message);
+      throw new Error(error.message);
     } else {
-      console.log("📥 Opgehaalde posts:", JSON.stringify(data, null, 2));
+      console.log("📥 Opgehaalde posts pagina:", JSON.stringify(data, null, 2));
 
-      // 🔹 Data correct mappen naar de `Post` interface
       const mappedPosts: Post[] = data.map((post: any) => ({
         id: post.id,
         userId: post.userId,
@@ -84,15 +86,54 @@ export const usePosts = () => {
         isPlaying: post.isPlaying,
       }));
 
-      setPosts(mappedPosts);
-      setError(null);
+      return mappedPosts;
     }
-    setLoading(false);
   };
 
+  // Laad de initiële posts (eerste batch)
   useEffect(() => {
-    fetchPosts();
+    const loadInitialPosts = async () => {
+      try {
+        setInitialLoading(true);
+        const initialPosts = await fetchPostsForPage(1);
+        setPosts(initialPosts);
+        setPage(1);
+        setError(null);
+      } catch (err: any) {
+        setError(err.message || "Fout bij het laden van posts");
+      }
+      setInitialLoading(false);
+    };
+    loadInitialPosts();
   }, []);
 
-  return { posts, loading, error, refetch: fetchPosts };
+  // Laad meer posts (extra batches)
+  const loadMorePosts = async () => {
+    try {
+      setLoadingMore(true);
+      const nextPage = page + 1;
+      const morePosts = await fetchPostsForPage(nextPage);
+      setPosts((prevPosts) => [...prevPosts, ...morePosts]);
+      setPage(nextPage);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || "Fout bij het laden van meer posts");
+    }
+    setLoadingMore(false);
+  };
+
+  const refetch = async () => {
+    try {
+      setInitialLoading(true);
+      const freshPosts = await fetchPostsForPage(1);
+      setPosts(freshPosts);
+      setPage(1);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || "Fout bij herladen van posts");
+    }
+    setInitialLoading(false);
+  };
+
+  return { posts, initialLoading, loadingMore, error, loadMorePosts, refetch };
 };

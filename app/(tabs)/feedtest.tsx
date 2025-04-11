@@ -12,9 +12,8 @@ import { useIsFocused } from "@react-navigation/native";
 import PostComponent from "../../components/postcomponent";
 import { useArtistTags } from "../../hooks/useArtistTags";
 import { useGenreTags } from "../../hooks/useGenreTags";
-import { usePosts } from "../../hooks/useFeedPosts";
-import { MediaPreloadProvider, useMediaPreload } from "../../context/MediaPreloadContext";
-import { PostData } from "../../components/postcomponent";
+import { usePosts } from "../../hooks/useFeedPosts"; // Aangepaste hook met pagination
+// Verwijder de import van useMediaPreload
 import { ActivePostProvider, useActivePost } from "../../context/activePostContext";
 
 const { width: windowWidth } = Dimensions.get("window");
@@ -22,38 +21,26 @@ const scale = windowWidth / 370;
 const itemLength = scale * 602;
 
 const FeedScreenContent: React.FC = () => {
-  const { posts, loading, error, refetch } = usePosts();
+  const { posts, initialLoading, loadingMore, error, refetch, loadMorePosts } = usePosts();
   const { activePostId, setActivePostId } = useActivePost();
+  const { artistTags, loading: artistLoading, error: artistError } = useArtistTags();
+  const { genreTags, loading: genreLoading, error: genreError } = useGenreTags();
   const [refreshing, setRefreshing] = useState(false);
   const isFocused = useIsFocused();
-  const { preloadAdjacent } = useMediaPreload();
+
+  // Bepaal de actieve index zodat we weten welke posts binnen een bepaald bereik vallen
   const activeIndex = posts.findIndex((p) => p.id === activePostId);
 
-  useEffect(() => {
-    if (activeIndex !== -1) {
-      // Stel een debounce in van bijvoorbeeld 300 milliseconden.
-      const debounceTimeout = setTimeout(() => {
-        // Converteer iedere post zodat timestamp een string is
-        const convertedPosts: PostData[] = posts.map((p) => ({
-          ...p,
-          timestamp: p.timestamp.toString(),
-        }));
-        preloadAdjacent(convertedPosts, activeIndex);
-      }, 300);
-      // Als de afhankelijkheden veranderen, wordt de timeout gecleared.
-      return () => clearTimeout(debounceTimeout);
-    }
-  }, [activeIndex, posts, preloadAdjacent]);
-
-  // Stel de eerste post in als actief wanneer posts geladen zijn
+  // Stel de eerste post in als actief zodra posts geladen zijn
   useEffect(() => {
     if (posts.length > 0 && activePostId === null) {
       setActivePostId(posts[0].id);
     }
   }, [posts, activePostId, setActivePostId]);
 
-  // Viewability voor FlatList (optioneel)
-  const viewabilityConfig = { itemVisiblePercentThreshold: 70 };
+  // Verwijder de preloadAdjacent-useEffect, want preloadlogica is nu overbodig
+
+  const viewabilityConfig = { itemVisiblePercentThreshold: 50 };
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: any[]; changed: any[] }) => {
       if (viewableItems && viewableItems.length > 0) {
@@ -64,8 +51,12 @@ const FeedScreenContent: React.FC = () => {
     }
   ).current;
 
-  const { artistTags, loading: artistLoading, error: artistError } = useArtistTags();
-  const { genreTags, loading: genreLoading, error: genreError } = useGenreTags();
+  // Handler voor infinite scroll: laad de volgende batch als er bijna het einde is bereikt
+  const handleEndReached = () => {
+    if (!loadingMore) {
+      loadMorePosts();
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -73,7 +64,8 @@ const FeedScreenContent: React.FC = () => {
     setRefreshing(false);
   };
 
-  if (loading || artistLoading || genreLoading) {
+  // Full-screen loader voor de initiële load
+  if (initialLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color="white" />
@@ -81,6 +73,7 @@ const FeedScreenContent: React.FC = () => {
     );
   }
 
+  // Toon foutmelding als er een fout is
   if (error || artistError || genreError) {
     return (
       <View style={styles.container}>
@@ -91,13 +84,27 @@ const FeedScreenContent: React.FC = () => {
     );
   }
 
+  // Footer component voor load-more indicator (als de gebruiker aan de onderkant komt)
+  const renderFooter = () => {
+    if (loadingMore && posts.length > 0) {
+      return (
+        <View style={styles.footer}>
+          <ActivityIndicator size="small" color="white" />
+          <Text style={{ color: "white", marginTop: 5 }}>Laden...</Text>
+        </View>
+      );
+    }
+    return null;
+  };
+
   return (
     <View style={styles.container}>
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={({ item, index }) => {
-          // Bepaal de preload-range. Hier is gekozen voor een window van ±4 posts.
+          // Hier blijft de berekening van de preload-range nog staan (bijv. ±4)
+          // Je kunt dit behouden als indicator voor de PostComponent, maar geen extra preload logica wordt uitgevoerd
           const isWithinPreloadRange = Math.abs(index - activeIndex) <= 4;
           return (
             <PostComponent 
@@ -113,10 +120,10 @@ const FeedScreenContent: React.FC = () => {
                 timestamp: item.timestamp.toString(),
               }}
               isActive={activePostId === item.id}
-              artistTags={artistTags}  
+              artistTags={artistTags}
               genreTags={genreTags}
-              feedFocused={isFocused}  // bestaande prop
-              withinPreloadRange={isWithinPreloadRange}  // nieuwe prop
+              feedFocused={isFocused}
+              withinPreloadRange={isWithinPreloadRange}
             />
           );
         }}
@@ -133,13 +140,15 @@ const FeedScreenContent: React.FC = () => {
         ListHeaderComponent={<View style={{ height: scale * 125 }} />}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.1}
+        ListFooterComponent={renderFooter}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       />
     </View>
   );
-  
 };
 
 const styles = StyleSheet.create({
@@ -154,15 +163,18 @@ const styles = StyleSheet.create({
     position: "absolute",
     zIndex: 9999,
   },
+  footer: {
+    paddingVertical: 20,
+    alignItems: "center",
+  },
 });
 
 const FeedScreen: React.FC = () => {
   return (
-    <MediaPreloadProvider>
-      <ActivePostProvider>
-        <FeedScreenContent />
-      </ActivePostProvider>
-    </MediaPreloadProvider>
+    // Als de MediaPreloadProvider niet langer nodig is, kan je deze eventueel ook verwijderen.
+    <ActivePostProvider>
+      <FeedScreenContent />
+    </ActivePostProvider>
   );
 };
 
