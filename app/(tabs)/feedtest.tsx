@@ -12,46 +12,123 @@ import { useIsFocused } from "@react-navigation/native";
 import PostComponent from "../../components/postcomponent";
 import { useArtistTags } from "../../hooks/useArtistTags";
 import { useGenreTags } from "../../hooks/useGenreTags";
-import { usePosts } from "../../hooks/useFeedPosts"; // Aangepaste hook met pagination
-// Verwijder de import van useMediaPreload
+import { usePosts } from "../../hooks/useFeedPosts"; // De hook met batch loading (PAGE_SIZE = 20)
 import { ActivePostProvider, useActivePost } from "../../context/activePostContext";
+import { Audio } from "expo-av";
+// Importeer de cache helper
+import { setCachedAudio } from "../../helpers/audioCache";
 
 const { width: windowWidth } = Dimensions.get("window");
 const scale = windowWidth / 370;
+// Zorg ervoor dat itemLength de volledige hoogte van een post vertegenwoordigt
 const itemLength = scale * 602;
 
 const FeedScreenContent: React.FC = () => {
-  const { posts, initialLoading, loadingMore, error, refetch, loadMorePosts } = usePosts();
+  const {
+    posts,
+    initialLoading,
+    loadingMore,
+    error,
+    refetch,
+    loadMorePosts,
+  } = usePosts();
   const { activePostId, setActivePostId } = useActivePost();
-  const { artistTags, loading: artistLoading, error: artistError } = useArtistTags();
-  const { genreTags, loading: genreLoading, error: genreError } = useGenreTags();
+  const {
+    artistTags,
+    loading: artistLoading,
+    error: artistError,
+  } = useArtistTags();
+  const {
+    genreTags,
+    loading: genreLoading,
+    error: genreError,
+  } = useGenreTags();
   const [refreshing, setRefreshing] = useState(false);
   const isFocused = useIsFocused();
 
-  // Bepaal de actieve index zodat we weten welke posts binnen een bepaald bereik vallen
+  // Ref om bij te houden welke posts al gepreloaded zijn
+  const preloadedPosts = useRef<{ [key: string]: boolean }>({});
+
+  // FlatList ref zodat we programatisch kunnen scrollen
+  const flatListRef = useRef<FlatList>(null);
+
   const activeIndex = posts.findIndex((p) => p.id === activePostId);
 
-  // Stel de eerste post in als actief zodra posts geladen zijn
   useEffect(() => {
     if (posts.length > 0 && activePostId === null) {
       setActivePostId(posts[0].id);
     }
   }, [posts, activePostId, setActivePostId]);
 
-  // Verwijder de preloadAdjacent-useEffect, want preloadlogica is nu overbodig
+  // Preload media en sla audio in de cache op
+  useEffect(() => {
+    posts.forEach((post) => {
+      if (!preloadedPosts.current[post.id]) {
+        preloadedPosts.current[post.id] = false;
 
-  const viewabilityConfig = { itemVisiblePercentThreshold: 50 };
+        if (post.mediaType === "video" && post.mediaUrl) {
+          fetch(post.mediaUrl.toString())
+            .then(() => {
+              console.log(
+                `Video media succesvol voorgepreloaded voor post ${post.id}`
+              );
+              preloadedPosts.current[post.id] = true;
+            })
+            .catch((err) => {
+              console.error(
+                "Fout bij preloading video voor post",
+                post.id,
+                err
+              );
+              preloadedPosts.current[post.id] = false;
+            });
+        } else if (post.mediaType === "photo" && post.audio) {
+          Audio.Sound.createAsync(
+            {
+              uri:
+                typeof post.audio === "string"
+                  ? post.audio
+                  : post.audio!.toString(),
+            },
+            { shouldPlay: false }
+          )
+            .then(({ sound }) => {
+              console.log(
+                `Audio succesvol voorgepreloaded voor post ${post.id}`
+              );
+              preloadedPosts.current[post.id] = true;
+              // Sla de geladen audio op in de cache
+              setCachedAudio(post.id, sound);
+            })
+            .catch((err) => {
+              console.error(
+                "Fout bij preloading audio voor post",
+                post.id,
+                err
+              );
+              preloadedPosts.current[post.id] = false;
+            });
+        } else {
+          preloadedPosts.current[post.id] = true;
+        }
+      }
+    });
+  }, [posts]);
+
+  const viewabilityConfig = { itemVisiblePercentThreshold: 70 };
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: any[]; changed: any[] }) => {
       if (viewableItems && viewableItems.length > 0) {
         const activeItem = viewableItems[0].item;
         setActivePostId(activeItem.id);
-        console.debug("[DEBUG] Active post set via onViewableItemsChanged:", activeItem.id);
+        console.debug(
+          "[DEBUG] Active post set via onViewableItemsChanged:",
+          activeItem.id
+        );
       }
     }
   ).current;
 
-  // Handler voor infinite scroll: laad de volgende batch als er bijna het einde is bereikt
   const handleEndReached = () => {
     if (!loadingMore) {
       loadMorePosts();
@@ -64,7 +141,18 @@ const FeedScreenContent: React.FC = () => {
     setRefreshing(false);
   };
 
-  // Full-screen loader voor de initiële load
+  // Handler voor het nauwkeurig snappen naar de dichtstbijzijnde post
+  const onMomentumScrollEnd = (e: any) => {
+    const offsetY = e.nativeEvent.contentOffset.y;
+    const index = Math.round(offsetY / itemLength);
+    if (flatListRef.current) {
+      flatListRef.current.scrollToOffset({
+        offset: index * itemLength,
+        animated: true,
+      });
+    }
+  };
+
   if (initialLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
@@ -73,7 +161,6 @@ const FeedScreenContent: React.FC = () => {
     );
   }
 
-  // Toon foutmelding als er een fout is
   if (error || artistError || genreError) {
     return (
       <View style={styles.container}>
@@ -84,7 +171,6 @@ const FeedScreenContent: React.FC = () => {
     );
   }
 
-  // Footer component voor load-more indicator (als de gebruiker aan de onderkant komt)
   const renderFooter = () => {
     if (loadingMore && posts.length > 0) {
       return (
@@ -100,21 +186,21 @@ const FeedScreenContent: React.FC = () => {
   return (
     <View style={styles.container}>
       <FlatList
+        ref={flatListRef}
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={({ item, index }) => {
-          // Hier blijft de berekening van de preload-range nog staan (bijv. ±4)
-          // Je kunt dit behouden als indicator voor de PostComponent, maar geen extra preload logica wordt uitgevoerd
           const isWithinPreloadRange = Math.abs(index - activeIndex) <= 4;
           return (
-            <PostComponent 
+            <PostComponent
               post={{
                 ...item,
                 userId: item.userId,
                 username: item.username || "Onbekend",
                 display_name: item.display_name,
                 role: item.role,
-                profileImage: item.profileImage || "https://via.placeholder.com/50",
+                profileImage:
+                  item.profileImage || "https://via.placeholder.com/50",
                 artistTags: item.artistTags ?? [],
                 genreTags: item.genreTags ?? [],
                 timestamp: item.timestamp.toString(),
@@ -127,7 +213,7 @@ const FeedScreenContent: React.FC = () => {
             />
           );
         }}
-        decelerationRate={0.2}
+        decelerationRate="fast" // Kan helpen voor consistente scrolling
         snapToAlignment="start"
         showsVerticalScrollIndicator={false}
         getItemLayout={(data, index) => ({
@@ -137,6 +223,7 @@ const FeedScreenContent: React.FC = () => {
         })}
         snapToInterval={itemLength}
         pagingEnabled
+        disableIntervalMomentum={true}  // Deze prop zorgt ervoor dat maar 1 post per keer wordt gescrold
         ListHeaderComponent={<View style={{ height: scale * 125 }} />}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
@@ -146,6 +233,7 @@ const FeedScreenContent: React.FC = () => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onMomentumScrollEnd={onMomentumScrollEnd}
       />
     </View>
   );
@@ -171,7 +259,6 @@ const styles = StyleSheet.create({
 
 const FeedScreen: React.FC = () => {
   return (
-    // Als de MediaPreloadProvider niet langer nodig is, kan je deze eventueel ook verwijderen.
     <ActivePostProvider>
       <FeedScreenContent />
     </ActivePostProvider>

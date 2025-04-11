@@ -1,37 +1,33 @@
-// PlaybackManager.tsx
 import { Audio } from 'expo-av';
 
-let currentPlayingAudio: Audio.Sound | null = null;
+export interface PlayableMedia {
+  playAsync: () => Promise<any>;
+  pauseAsync: () => Promise<any>;
+  setPositionAsync: (position: number) => Promise<any>;
+}
 
-/**
- * Voordat nieuwe audio wordt gestart, pauzeer en reset de vorige audio.
- * Vervolgens wordt de nieuwe audio als actief ingesteld.
- */
-export const setCurrentPlayingAudio = async (newAudio: Audio.Sound | null) => {
-  if (currentPlayingAudio && currentPlayingAudio !== newAudio) {
+let currentPlayingMedia: PlayableMedia | null = null;
+
+export const setCurrentPlayingMedia = async (newMedia: PlayableMedia | null) => {
+  if (currentPlayingMedia && currentPlayingMedia !== newMedia) {
     try {
-      // Pauzeer en reset de vorige audio
-      await currentPlayingAudio.pauseAsync();
-      await currentPlayingAudio.setPositionAsync(0);
+      await currentPlayingMedia.pauseAsync();
+      await currentPlayingMedia.setPositionAsync(0);
     } catch (error) {
-      console.error("Fout bij stoppen vorige audio:", error);
+      console.error("Error stopping previous media:", error);
     }
   }
-  currentPlayingAudio = newAudio;
+  currentPlayingMedia = newMedia;
 };
 
-/**
- * Stop en reset de huidige actieve audio en maak deze leeg.
- */
-export const stopCurrentAudio = async () => {
-  if (currentPlayingAudio) {
+export const stopCurrentMedia = async () => {
+  if (currentPlayingMedia) {
     try {
-      await currentPlayingAudio.pauseAsync();
-      await currentPlayingAudio.setPositionAsync(0);
+      await currentPlayingMedia.pauseAsync();
+      await currentPlayingMedia.setPositionAsync(0);
     } catch (error) {
-      console.error("Fout bij stoppen huidige audio:", error);
+      console.error("Error stopping current media:", error);
     }
-    currentPlayingAudio = null;
+    currentPlayingMedia = null;
   }
 };
-

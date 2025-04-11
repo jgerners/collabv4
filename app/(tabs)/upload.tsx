@@ -24,7 +24,7 @@ const getPresignedUrl = async (
 ): Promise<string | null> => {
   try {
     const response = await fetch(
-      `http://192.168.178.55:3000/get-presigned-url?fileName=${encodeURIComponent(
+      `http://192.168.178.145:3000/get-presigned-url?fileName=${encodeURIComponent(
         uniqueName
       )}&contentType=${encodeURIComponent(contentType)}`
     );

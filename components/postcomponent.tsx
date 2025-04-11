@@ -16,8 +16,10 @@ import {
 import { Video, ResizeMode, Audio } from "expo-av";
 import { useAuth } from "../context/authContext";
 import Slider from "@react-native-community/slider";
-// Verwijder useMediaPreload want we schakelen preload-logica uit
-import { setCurrentPlayingAudio, stopCurrentAudio } from "../PlaybackManager";
+import { setCurrentPlayingMedia, stopCurrentMedia } from "../PlaybackManager";
+
+// Importeer de audio cache helper
+import { getCachedAudio, setCachedAudio } from "../helpers/audioCache";
 
 import ProfileLink from "./profileLink";
 import Like from "./mainbuttons/like";
@@ -26,7 +28,7 @@ import PlayPause from "./mainbuttons/play_pause";
 import Collab from "./mainbuttons/collab";
 import ArtistTag from "./mainbuttons/tags/artist_tags";
 import GenreTag from "./mainbuttons/tags/genre_tags";
-import ReplayButton from "./mainbuttons/replay"; // ReplayButton als los component
+import ReplayButton from "./mainbuttons/replay";
 import SaveButton from "./mainbuttons/save";
 
 // Activeer LayoutAnimation op Android
@@ -76,7 +78,7 @@ interface PostProps {
   genreTags: GenreTagData[];
   isActive: boolean;    // Geeft aan of de post automatisch moet afspelen
   feedFocused: boolean; // Geeft aan of de feed in focus is
-  withinPreloadRange: boolean; // Deze prop blijft beschikbaar als indicator, maar wordt hier niet meer actief gebruikt
+  withinPreloadRange: boolean; // Indicator, maar niet meer actief gebruikt
 }
 
 const PostComponent: React.FC<PostProps> = ({
@@ -97,6 +99,9 @@ const PostComponent: React.FC<PostProps> = ({
 
   const toggleAnim = useRef(new Animated.Value(0)).current;
   const [artistExpanded, setArtistExpanded] = useState(false);
+
+  // Deze ref zorgt ervoor dat auto-play slechts één keer per activatie gebeurt
+  const hasAutoPlayedRef = useRef(false);
 
   const expandArtistTags = () => {
     if (!artistExpanded) {
@@ -122,7 +127,6 @@ const PostComponent: React.FC<PostProps> = ({
 
   const videoRef = useRef<Video | null>(null);
   const audioRef = useRef<Audio.Sound | null>(null);
-  // Verwijder getPreloadedAudio, want we laden audio direct
 
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -131,7 +135,7 @@ const PostComponent: React.FC<PostProps> = ({
     try {
       await fn();
     } catch (error) {
-      // Eventueel logging toevoegen
+      // Eventuele logging
     }
   };
 
@@ -162,17 +166,47 @@ const PostComponent: React.FC<PostProps> = ({
     }
   };
 
-  const playAudio = async (sound: Audio.Sound) => {
+  // Aangepaste playAudio-functie met optionele parameter "reset"
+  // reset = true: positie naar 0 zetten (auto-play), reset = false: huidige positie behouden
+  const playAudio = async (reset: boolean = true) => {
+    setAudioLoading(true);
     try {
-      const status = await sound.getStatusAsync();
-      if (status.isLoaded) {
-        await sound.playAsync();
+      let sound = getCachedAudio(post.id);
+      const audioUri =
+        typeof post.audio === "string" ? post.audio : post.audio!.toString();
+      if (sound) {
+        const status = await sound.getStatusAsync();
+        if (!status.isLoaded) {
+          const { sound: newSound } = await Audio.Sound.createAsync(
+            { uri: audioUri },
+            { shouldPlay: true }
+          );
+          sound = newSound;
+          setCachedAudio(post.id, sound);
+          sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+        } else {
+          if (reset) {
+            await sound.setPositionAsync(0);
+          }
+          // Stel de status-update callback in zodat de seekbar werkt
+          sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+          await sound.playAsync();
+        }
       } else {
-        await retryPlayAudio(sound);
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri: audioUri },
+          { shouldPlay: true }
+        );
+        sound = newSound;
+        setCachedAudio(post.id, sound);
+        sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
       }
+      audioRef.current = sound;
+      setIsPlaying(true);
     } catch (error) {
-      // Foutafhandeling
+      console.error("Fout bij het laden van audio:", error);
     }
+    setAudioLoading(false);
   };
 
   useEffect(() => {
@@ -181,57 +215,65 @@ const PostComponent: React.FC<PostProps> = ({
     }
   }, [post.mediaType]);
 
-  // Automatische afspeel-/pauze-logica voor audio en video (zonder extra preload)
+  // Auto-play effect: wanneer de post actief is en de feed gefocust is,
+  // proberen we de media te starten. Indien er al een audio-instantie bestaat,
+  // controleren we eerst of deze geladen is en of er al een positie is.
   useEffect(() => {
     const managePlayback = async () => {
       if (isActive && feedFocused) {
-        if (!manualPaused) {
-          if (post.mediaType === "video" && videoRef.current) {
-            awaitOrIgnore(() => videoRef.current!.playAsync());
-            setIsPlaying(true);
-          } else if (post.mediaType === "photo" && post.audio) {
-            setAudioLoading(true);
-            // Direct audio laden via createAsync, geen cache meer ophalen
-            const playDirectly = async () => {
-              try {
-                const audioUri = typeof post.audio === "string" ? post.audio : post.audio!.toString();
-                const { sound } = await Audio.Sound.createAsync(
-                  { uri: audioUri },
-                  { shouldPlay: true }
-                );
-                audioRef.current = sound;
-                // Stel de globale audio in zodat andere instanties stoppen
-                await setCurrentPlayingAudio(sound);
-                setIsPlaying(true);
-                sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
-              } catch (error) {
-                console.error("Fout bij het laden van audio:", error);
-              }
-              setAudioLoading(false);
-            };
-            playDirectly();
+        if (post.mediaType === "video" && videoRef.current) {
+          await setCurrentPlayingMedia(videoRef.current);
+          awaitOrIgnore(() => videoRef.current!.playAsync());
+          setIsPlaying(true);
+        } else if (post.mediaType === "photo" && post.audio) {
+          let sound = getCachedAudio(post.id);
+          if (sound) {
+            const status = await sound.getStatusAsync();
+            if (status.isLoaded) {
+              // Als de audio al een positie heeft (dus niet 0), hervatten met reset = false,
+              // anders starten we vanaf het begin (reset = true)
+              const shouldReset = status.positionMillis === 0;
+              await playAudio(shouldReset);
+            } else {
+              await playAudio(true);
+            }
+          } else {
+            await playAudio(true);
           }
         }
+        hasAutoPlayedRef.current = true;
       } else {
-        if (post.mediaType === "video" && videoRef.current) {
-          awaitOrIgnore(() => videoRef.current!.pauseAsync());
-          awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
-          setIsPlaying(false);
-        } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
-          // Bij niet-actief, stoppen en unloaden (geen onderscheid meer op preload-range)
-          awaitOrIgnore(() => audioRef.current!.stopAsync());
-          awaitOrIgnore(() => audioRef.current!.unloadAsync());
-          audioRef.current = null;
-          setIsPlaying(false);
-          await stopCurrentAudio();
+        // Als de feed gefocust blijft en de post niet actief is (bij scrollen),
+        // pauzeren we de media EN resetten we de positie.
+        if (feedFocused) {
+          if (post.mediaType === "video" && videoRef.current) {
+            awaitOrIgnore(() => videoRef.current!.pauseAsync());
+            awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
+            setIsPlaying(false);
+          } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+            awaitOrIgnore(() => audioRef.current!.pauseAsync());
+            awaitOrIgnore(() => audioRef.current!.setPositionAsync(0));
+            setIsPlaying(false);
+          }
+        } else {
+          // Als de feed niet gefocust is (navigatie weg), pauzeren we maar laten we de positie behouden.
+          if (post.mediaType === "video" && videoRef.current) {
+            awaitOrIgnore(() => videoRef.current!.pauseAsync());
+            setIsPlaying(false);
+          } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+            awaitOrIgnore(() => audioRef.current!.pauseAsync());
+            setIsPlaying(false);
+          }
         }
+        // Reset de auto-play flag als de post niet langer actief is.
+        hasAutoPlayedRef.current = false;
       }
     };
 
     managePlayback();
-  }, [isActive, feedFocused, manualPaused, /* verwijder withinPreloadRange indien niet meer nodig */]);
+  }, [isActive, feedFocused]);
 
-  // Handmatige play/pause functie
+  // Handmatige play/pause: direct de audio besturen zonder positie-reset.
   const handlePlayPause = async () => {
     if (post.mediaType === "video" && videoRef.current) {
       if (isPlaying) {
@@ -262,7 +304,22 @@ const PostComponent: React.FC<PostProps> = ({
     }
   };
 
-  // Replay functie: reset positie en speel opnieuw
+  // Seekbar-handler: pas de positie aan zonder automatische reset.
+  const handleSlidingComplete = async (value: number) => {
+    const newPosition = value * duration;
+    if (post.mediaType === "video" && videoRef.current) {
+      await videoRef.current.setPositionAsync(newPosition);
+    } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+      await audioRef.current.setPositionAsync(newPosition);
+      const status = await audioRef.current.getStatusAsync();
+      if (status.isLoaded && !status.isPlaying) {
+        await audioRef.current.playAsync();
+        setIsPlaying(true);
+      }
+    }
+  };
+
+  // Replay: reset positie naar 0 en start opnieuw af (auto-play met reset = true)
   const handleReplay = async () => {
     if (post.mediaType === "video" && videoRef.current) {
       awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
@@ -275,18 +332,15 @@ const PostComponent: React.FC<PostProps> = ({
     }
   };
 
-  // Cleanup: zorg dat bij unmount de audio stopt
+  // Cleanup: bij unmount pauzeren we de media maar resetten we de positie niet,
+  // zodat bij terugkomst de positie behouden blijft.
   useEffect(() => {
     return () => {
       if (post.mediaType === "photo" && post.audio && audioRef.current) {
-        awaitOrIgnore(() => audioRef.current!.stopAsync());
-        awaitOrIgnore(() => audioRef.current!.setPositionAsync(0));
-        audioRef.current = null;
-        stopCurrentAudio();
+        awaitOrIgnore(() => audioRef.current!.pauseAsync());
       }
       if (post.mediaType === "video" && videoRef.current) {
         awaitOrIgnore(() => videoRef.current!.pauseAsync());
-        awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
       }
     };
   }, []);
@@ -368,7 +422,7 @@ const PostComponent: React.FC<PostProps> = ({
           <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
         )}
 
-    
+      
 
         <View style={styles.controlsContainer}>
           <View style={styles.playButtonContainer}>
@@ -383,19 +437,7 @@ const PostComponent: React.FC<PostProps> = ({
               minimumTrackTintColor="#FFFFFF"
               maximumTrackTintColor="#000000"
               thumbTintColor="#FFFFFF00"
-              onSlidingComplete={async (value: number) => {
-                const newPosition = value * duration;
-                if (post.mediaType === "video" && videoRef.current) {
-                  await videoRef.current.setPositionAsync(newPosition);
-                } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
-                  await audioRef.current.setPositionAsync(newPosition);
-                  const status = await audioRef.current.getStatusAsync();
-                  if (status.isLoaded && !status.isPlaying) {
-                    await audioRef.current.playAsync();
-                    setIsPlaying(true);
-                  }
-                }
-              }}
+              onSlidingComplete={handleSlidingComplete}
             />
           </View>
           <ReplayButton onPress={handleReplay} />
@@ -521,7 +563,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
- 
+  
   controlsContainer: {
     position: "absolute",
     bottom: scale * 2,
