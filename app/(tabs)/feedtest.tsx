@@ -1,4 +1,6 @@
-import React, { useRef, useState } from "react";
+// app/(tabs)/feedtest.tsx
+
+import React, { useRef, useState, useEffect } from "react";
 import {
   View,
   FlatList,
@@ -12,28 +14,24 @@ import PostComponent from "../../components/postcomponent";
 import { useArtistTags } from "../../hooks/useArtistTags";
 import { useGenreTags } from "../../hooks/useGenreTags";
 import { usePosts } from "../../hooks/useFeedPosts";
+import { ActivePostProvider, useActivePost } from "../../context/activePostContext";
 
 // Bereken de schaalfactor op basis van een basisbreedte van 370
 const { width: windowWidth } = Dimensions.get("window");
 const scale = windowWidth / 370;
-const itemLength = scale * 600;
+const itemLength = scale * 602;
 
-const FeedScreen: React.FC = () => {
+const FeedScreenContent: React.FC = () => {
   const { posts, loading, error, refetch } = usePosts();
-  const [activePostId, setActivePostId] = useState<string | null>(null);
+  const { activePostId, setActivePostId } = useActivePost();
   const [refreshing, setRefreshing] = useState(false);
 
-  const viewabilityConfig = {
-    itemVisiblePercentThreshold: 80,
-  };
-
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: any[] }) => {
-      if (viewableItems.length > 0) {
-        setActivePostId(viewableItems[0].item.id);
-      }
+  // Stel de eerste post als actief in zodra posts geladen zijn
+  useEffect(() => {
+    if (posts.length > 0 && activePostId === null) {
+      setActivePostId(posts[0].id);
     }
-  ).current;
+  }, [posts, activePostId, setActivePostId]);
 
   const { artistTags, loading: artistLoading, error: artistError } = useArtistTags();
   const { genreTags, loading: genreLoading, error: genreError } = useGenreTags();
@@ -95,8 +93,13 @@ const FeedScreen: React.FC = () => {
         })}
         snapToInterval={itemLength}
         ListHeaderComponent={<View style={{ height: scale * 125 }} />}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
+        onMomentumScrollEnd={(event) => {
+          const offsetY = event.nativeEvent.contentOffset.y;
+          const index = Math.round(offsetY / itemLength);
+          const activeId = posts[index] ? posts[index].id : null;
+          console.debug("[DEBUG] onMomentumScrollEnd set activeId:", activeId);
+          setActivePostId(activeId);
+        }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -121,5 +124,13 @@ const styles = StyleSheet.create({
     zIndex: 9999,
   },
 });
+
+const FeedScreen: React.FC = () => {
+  return (
+    <ActivePostProvider>
+      <FeedScreenContent />
+    </ActivePostProvider>
+  );
+};
 
 export default FeedScreen;

@@ -15,11 +15,23 @@ interface ArtistTagProps {
   id: string;
   name: string;
   image: string;
+  disableModuleOpen?: boolean; // Bepaalt of de module-opening wordt uitgeschakeld
+  onPressModule?: () => void;   // De functie die de module opent, indien beschikbaar
 }
 
-const ArtistTag: React.FC<ArtistTagProps> = ({ id, name, image }) => {
+const ArtistTag: React.FC<ArtistTagProps> = ({ id, name, image, disableModuleOpen, onPressModule }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  
+  const handlePress = () => {
+    if (!disableModuleOpen) {
+      if (onPressModule) {
+        onPressModule();
+      } else {
+        openModal();
+      }
+    }
+  };
 
   const openModal = () => {
     setModalVisible(true);
@@ -40,9 +52,19 @@ const ArtistTag: React.FC<ArtistTagProps> = ({ id, name, image }) => {
     }).start(() => setModalVisible(false));
   };
 
+  // Als module-opening uitgeschakeld is, render dan een gewone View zodat geen touch wordt afgehandeld.
+  if (disableModuleOpen) {
+    return (
+      <View style={styles.imageContainer}>
+        <Image source={{ uri: image }} style={styles.image} />
+      </View>
+    );
+  }
+
+  // Anders renderen we de TouchableOpacity met de onPress-handler.
   return (
     <>
-      <TouchableOpacity onPress={openModal} activeOpacity={0.8}>
+      <TouchableOpacity onPress={handlePress} activeOpacity={0.8}>
         <View style={styles.imageContainer}>
           <Image source={{ uri: image }} style={styles.image} />
         </View>
@@ -72,7 +94,6 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     overflow: "hidden",
     backgroundColor: "#ccc",
-      
   },
   image: {
     width: "100%",
@@ -91,7 +112,6 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 20,
     alignItems: "center",
-    // Schaduw voor een mooie diepte
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -120,7 +140,7 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   closeButton: {
-    backgroundColor: "#800080", // Paarse kleur
+    backgroundColor: "#800080",
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,

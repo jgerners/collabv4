@@ -138,7 +138,7 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
 
 const styles = StyleSheet.create({
   buttonContainer: {
-    marginRight: 10,
+    
   },
   collabButton: {
     padding: 5,

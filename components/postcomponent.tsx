@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import {
+  Animated,
   View,
   Text,
   Image,
@@ -16,6 +17,8 @@ import { useIsFocused } from "@react-navigation/native";
 import { useAuth } from "../context/authContext";
 import Slider from "@react-native-community/slider";
 
+import { useFocusEffect } from "@react-navigation/native";
+
 import ProfileLink from "./profileLink";
 import Like from "./mainbuttons/like";
 import Follow from "./mainbuttons/follow";
@@ -24,13 +27,13 @@ import Collab from "./mainbuttons/collab";
 import ArtistTag from "./mainbuttons/tags/artist_tags";
 import GenreTag from "./mainbuttons/tags/genre_tags";
 import ReplayButton from "./mainbuttons/replay"; // ReplayButton als los component
+import SaveButton from "./mainbuttons/save";
 
 // Activeer LayoutAnimation op Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// Bereken de schaalfactor op basis van een basisbreedte van 370
 const { width: windowWidth } = Dimensions.get("window");
 const scale = windowWidth / 370;
 
@@ -74,19 +77,48 @@ interface PostProps {
   isActive: boolean; // Geeft aan of de post via scroll automatisch moet afspelen
 }
 
+// ... (import statements en overige code blijven ongewijzigd)
+
 const PostComponent: React.FC<PostProps> = ({
   post,
   isActive,
   artistTags,
   genreTags,
 }) => {
-  console.log("Post data:", post);
+  console.debug("[DEBUG] PostComponent init for post:", post.id);
+
   const { user } = useAuth();
   const currentUserId = user?.id;
   const [isPlaying, setIsPlaying] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [manualPaused, setManualPaused] = useState(false);
   const [showSeeMore, setShowSeeMore] = useState(false);
+
+  // Animated waarde voor de header-tags
+  const toggleAnim = useRef(new Animated.Value(0)).current;
+  const [artistExpanded, setArtistExpanded] = useState(false);
+
+  const expandArtistTags = () => {
+    if (!artistExpanded) {
+      Animated.timing(toggleAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+      setArtistExpanded(true);
+    }
+  };
+
+  const collapseArtistTags = () => {
+    if (artistExpanded) {
+      Animated.timing(toggleAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+      setArtistExpanded(false);
+    }
+  };
 
   const videoRef = useRef<Video | null>(null);
   const audioRef = useRef<Audio.Sound | null>(null);
@@ -95,14 +127,15 @@ const PostComponent: React.FC<PostProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
 
   const isFocused = useIsFocused();
-  // Sla op of de media vóór focusverlies speelde
   const wasPlayingBeforeFocusLoss = useRef(false);
+
+  
 
   const awaitOrIgnore = async (fn: () => Promise<any>) => {
     try {
       await fn();
     } catch (error) {
-      console.error("Ignored error:", error);
+      console.error("[DEBUG] awaitOrIgnore error:", error);
     }
   };
 
@@ -110,6 +143,7 @@ const PostComponent: React.FC<PostProps> = ({
     if (status.isLoaded) {
       setCurrentTime(status.positionMillis);
       setDuration(status.durationMillis);
+      
     }
   };
 
@@ -118,160 +152,156 @@ const PostComponent: React.FC<PostProps> = ({
     setDescriptionExpanded(!descriptionExpanded);
   };
 
-  // EFFECT 1: Reactie op scroll- (isActive) en focus samen (bij mount en scroll)
-  useEffect(() => {
-    if (isFocused) {
-      if (isActive) {
-        if (!manualPaused && !isPlaying) {
-          if (post.mediaType === "video" && videoRef.current) {
-            console.log(`Auto-playing video ${post.id} from beginning (scroll)`);
-            awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
-            awaitOrIgnore(() => videoRef.current!.playAsync());
-            setIsPlaying(true);
-          } else if (post.mediaType === "photo" && post.audio) {
-            if (!audioRef.current) {
-              const handleAudio = async () => {
-                console.log(`Auto-loading and playing audio for post ${post.id} from beginning (scroll)`);
-                try {
-                  const audioUri = typeof post.audio === "string" ? post.audio : post.audio!.toString();
-                  const { sound } = await Audio.Sound.createAsync(
-                    { uri: audioUri },
-                    { shouldPlay: true }
-                  );
-                  audioRef.current = sound;
-                  setIsPlaying(true);
-                  sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
-                } catch (error) {
-                  console.error("Error auto-loading audio:", error);
-                }
-              };
-              handleAudio();
-            }
-          }
-        }
-      } else {
+ // EFFECT 1: Reactie op scroll- (isActive) en focus samen (bij mount en scroll)
+ useEffect(() => {
+  if (isFocused) {
+    if (isActive) {
+      if (!manualPaused && !isPlaying) {
         if (post.mediaType === "video" && videoRef.current) {
-          console.log(`Auto-pausing video ${post.id} (scroll)`);
-          awaitOrIgnore(() => videoRef.current!.pauseAsync());
+          console.log(`Auto-playing video ${post.id} from beginning (scroll)`);
           awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
-          setIsPlaying(false);
-        } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
-          console.log(`Auto-stopping and unloading audio for post ${post.id} (scroll)`);
-          awaitOrIgnore(() => audioRef.current!.stopAsync());
-          awaitOrIgnore(() => audioRef.current!.unloadAsync());
-          audioRef.current = null;
-          setIsPlaying(false);
-        }
-        setManualPaused(false);
-      }
-    }
-  }, [isActive, isFocused]);
-
-  // EFFECT 2: Reactie op navigatiefocus (isFocused) los van scroll
-  useEffect(() => {
-    if (!isFocused) {
-      wasPlayingBeforeFocusLoss.current = isPlaying;
-      console.log(`Screen lost focus - pausing media for post ${post.id}`);
-      if (post.mediaType === "video" && videoRef.current) {
-        awaitOrIgnore(() => videoRef.current!.pauseAsync());
-      } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
-        awaitOrIgnore(() => audioRef.current!.pauseAsync());
-      }
-      setIsPlaying(false);
-    } else {
-      if (wasPlayingBeforeFocusLoss.current && !manualPaused && !isPlaying) {
-        console.log(`Screen refocused - resuming media for post ${post.id}`);
-        if (post.mediaType === "video" && videoRef.current) {
           awaitOrIgnore(() => videoRef.current!.playAsync());
           setIsPlaying(true);
-        } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
-          awaitOrIgnore(() => audioRef.current!.playAsync());
-          setIsPlaying(true);
+        } else if (post.mediaType === "photo" && post.audio) {
+          if (!audioRef.current) {
+            const handleAudio = async () => {
+              console.log(`Auto-loading and playing audio for post ${post.id} from beginning (scroll)`);
+              try {
+                const audioUri = typeof post.audio === "string" ? post.audio : post.audio!.toString();
+                const { sound } = await Audio.Sound.createAsync(
+                  { uri: audioUri },
+                  { shouldPlay: true }
+                );
+                audioRef.current = sound;
+                setIsPlaying(true);
+                sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+              } catch (error) {
+                console.error("Error auto-loading audio:", error);
+              }
+            };
+            handleAudio();
+          }
         }
       }
-      wasPlayingBeforeFocusLoss.current = false;
-    }
-  }, [isFocused]);
-
-  useEffect(() => {
-    if (!isActive && manualPaused) {
+    } else {
+      if (post.mediaType === "video" && videoRef.current) {
+        console.log(`Auto-pausing video ${post.id} (scroll)`);
+        awaitOrIgnore(() => videoRef.current!.pauseAsync());
+        awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
+        setIsPlaying(false);
+      } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+        console.log(`Auto-stopping and unloading audio for post ${post.id} (scroll)`);
+        awaitOrIgnore(() => audioRef.current!.stopAsync());
+        awaitOrIgnore(() => audioRef.current!.unloadAsync());
+        audioRef.current = null;
+        setIsPlaying(false);
+      }
       setManualPaused(false);
     }
-  }, [isActive]);
+  }
+}, [isActive, isFocused]);
 
-  useEffect(() => {
+// EFFECT 2: Reactie op navigatiefocus (isFocused) los van scroll
+useEffect(() => {
+  if (!isFocused) {
+    wasPlayingBeforeFocusLoss.current = isPlaying;
+    console.log(`Screen lost focus - pausing media for post ${post.id}`);
     if (post.mediaType === "video" && videoRef.current) {
-      videoRef.current.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+      awaitOrIgnore(() => videoRef.current!.pauseAsync());
+    } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+      awaitOrIgnore(() => audioRef.current!.pauseAsync());
     }
-  }, [post.mediaType]);
+    setIsPlaying(false);
+  } else {
+    if (wasPlayingBeforeFocusLoss.current && !manualPaused && !isPlaying) {
+      console.log(`Screen refocused - resuming media for post ${post.id}`);
+      if (post.mediaType === "video" && videoRef.current) {
+        awaitOrIgnore(() => videoRef.current!.playAsync());
+        setIsPlaying(true);
+      } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+        awaitOrIgnore(() => audioRef.current!.playAsync());
+        setIsPlaying(true);
+      }
+    }
+    wasPlayingBeforeFocusLoss.current = false;
+  }
+}, [isFocused]);
 
-  // Handmatige play/pause functie (wanneer de gebruiker tikt)
+useEffect(() => {
+  if (!isActive && manualPaused) {
+    setManualPaused(false);
+  }
+}, [isActive]);
+
+useEffect(() => {
+  if (post.mediaType === "video" && videoRef.current) {
+    videoRef.current.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+  }
+}, [post.mediaType]);
+
+
+  // Handmatige play/pause functie
   const handlePlayPause = async () => {
     if (post.mediaType === "video" && videoRef.current) {
       if (isPlaying) {
-        console.log(`Manually pausing video ${post.id}`);
         await videoRef.current.pauseAsync();
         setIsPlaying(false);
         setManualPaused(true);
+        console.debug("[DEBUG] Manual pause video for post:", post.id);
       } else {
-        console.log(`Manually resuming video ${post.id} from current position`);
         await videoRef.current.playAsync();
         setIsPlaying(true);
         setManualPaused(false);
+        console.debug("[DEBUG] Manual resume video for post:", post.id);
       }
     } else if (post.mediaType === "photo" && post.audio) {
       if (audioRef.current) {
         if (isPlaying) {
-          console.log(`Manually pausing audio for post ${post.id}`);
           try {
             await audioRef.current.pauseAsync();
           } catch (error) {
-            console.error("Error pausing audio:", error);
+            console.error("[DEBUG] Manual pause audio error for post:", post.id, error);
           }
           setIsPlaying(false);
           setManualPaused(true);
+          console.debug("[DEBUG] Manual pause audio for post:", post.id);
         } else {
-          console.log(`Manually resuming audio for post ${post.id} from current position`);
           try {
             await audioRef.current.playAsync();
           } catch (error) {
-            console.error("Error resuming audio:", error);
+            console.error("[DEBUG] Manual resume audio error for post:", post.id, error);
           }
           setIsPlaying(true);
           setManualPaused(false);
+          console.debug("[DEBUG] Manual resume audio for post:", post.id);
         }
       }
     }
   };
 
-  // Nieuwe replay functie: start de media opnieuw vanaf het begin
+  // Replay functie
   const handleReplay = async () => {
     if (post.mediaType === "video" && videoRef.current) {
-      console.log(`Replaying video ${post.id}`);
       awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
       awaitOrIgnore(() => videoRef.current!.playAsync());
       setIsPlaying(true);
+      console.debug("[DEBUG] Replay video for post:", post.id);
     } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
-      console.log(`Replaying audio for post ${post.id}`);
       awaitOrIgnore(() => audioRef.current!.setPositionAsync(0));
       awaitOrIgnore(() => audioRef.current!.playAsync());
       setIsPlaying(true);
+      console.debug("[DEBUG] Replay audio for post:", post.id);
     }
   };
 
   return (
     <View style={styles.postContainer}>
-      {/* Post Header */}
       <View style={styles.postHeader}>
         <View style={styles.profileContainer}>
           <ProfileLink userId={post.userId}>
             <Image
               source={{ uri: post.profileImage }}
-              style={{
-                width: scale * 30,
-                height: scale * 30,
-                borderRadius: scale * 15,
-              }}
+              style={{ width: scale * 30, height: scale * 30, borderRadius: scale * 15 }}
             />
           </ProfileLink>
           <ProfileLink userId={post.userId}>
@@ -283,30 +313,49 @@ const PostComponent: React.FC<PostProps> = ({
             </View>
           </ProfileLink>
         </View>
-        {/* In de header komt nu de tags (rechtsboven) */}
         <View style={styles.headerTags}>
-          <View style={styles.artistTagsContainerHeader}>
-            {post.artistTags?.map((tagId, index) => {
-              const foundTag = artistTags.find((tag) => tag.id === tagId);
-              return foundTag ? (
-                <View key={foundTag.id} style={{ marginLeft: index === 0 ? 0 : -10 }}>
-                  <ArtistTag id={foundTag.id} name={foundTag.name} image={foundTag.image} />
-                </View>
-              ) : null;
-            })}
-          </View>
-          <View style={styles.genreTagsContainerHeader}>
-            {post.genreTags?.map((tagId, index) => {
-              const foundTag = genreTags.find((tag) => tag.id === tagId);
-              return foundTag ? (
-                <GenreTag key={foundTag.id} id={foundTag.id} name={foundTag.name} />
-              ) : null;
-            })}
-          </View>
+          <TouchableOpacity onPress={expandArtistTags}>
+            <View style={styles.artistTagsContainerHeader}>
+              {post.artistTags?.map((tagId, index) => {
+                const foundTag = artistTags.find((tag) => tag.id === tagId);
+                if (!foundTag) return null;
+                const animatedMargin = index === 0 ? 0 : toggleAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-10, 5],
+                });
+                return (
+                  <Animated.View key={foundTag.id} style={{ marginLeft: animatedMargin }}>
+                    <ArtistTag 
+                      id={foundTag.id} 
+                      name={foundTag.name} 
+                      image={foundTag.image} 
+                      disableModuleOpen={!artistExpanded} 
+                    />
+                  </Animated.View>
+                );
+              })}
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={collapseArtistTags}>
+            <View style={styles.genreTagsContainerHeader}>
+              {post.genreTags?.map((tagId, index) => {
+                const foundTag = genreTags.find((tag) => tag.id === tagId);
+                if (!foundTag) return null;
+                const animatedMargin = index === 0 ? 0 : toggleAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [2, -20],
+                });
+                return (
+                  <Animated.View key={foundTag.id} style={{ marginLeft: animatedMargin }}>
+                    <GenreTag id={foundTag.id} name={foundTag.name} />
+                  </Animated.View>
+                );
+              })}
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Media Container */}
       <Pressable onPress={handlePlayPause} style={styles.mediaContainer}>
         {post.mediaType === "video" ? (
           <Video
@@ -321,8 +370,6 @@ const PostComponent: React.FC<PostProps> = ({
         ) : (
           <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
         )}
-
-        {/* Controls Container */}
         <View style={styles.controlsContainer}>
           <View style={styles.playButtonContainer}>
             <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
@@ -348,13 +395,12 @@ const PostComponent: React.FC<PostProps> = ({
                     setIsPlaying(true);
                   }
                 }
+                console.debug("[DEBUG] Slider onSlidingComplete for post:", post.id, "newPosition:", newPosition);
               }}
             />
           </View>
           <ReplayButton onPress={handleReplay} />
         </View>
-
-        {/* Info Overlay */}
         <View style={styles.infoOverlay}>
           <Text style={styles.postTitle}>{post.title}</Text>
           <Text
@@ -383,17 +429,25 @@ const PostComponent: React.FC<PostProps> = ({
         </View>
       </Pressable>
 
-      {/* Onderste container: like/follow links en collab rechts */}
       <View style={styles.bottomContainer}>
-        <View style={styles.bottomButtons}>
+        <View style={styles.leftButtons}>
           {currentUserId && (
-            <Like postId={post.id} userId={currentUserId} receiverId={post.userId} />
+            <View style={styles.buttonWrapper}>
+              <Like postId={post.id} userId={currentUserId} receiverId={post.userId} />
+            </View>
           )}
           {currentUserId && (
-            <Follow followerId={currentUserId} followingId={post.userId} />
+            <View style={styles.buttonWrapper}>
+              <SaveButton postId={post.id} userId={currentUserId} />
+            </View>
+          )}
+          {currentUserId && (
+            <View style={styles.buttonWrapper}>
+              <Follow followerId={currentUserId} followingId={post.userId} />
+            </View>
           )}
         </View>
-        <View style={styles.postActions}>
+        <View style={styles.rightButtons}>
           {currentUserId ? (
             <Collab senderId={currentUserId} receiverId={post.userId} postId={post.id} />
           ) : (
@@ -442,7 +496,6 @@ const styles = StyleSheet.create({
   dot: {
     marginHorizontal: scale * 3,
   },
-  // Nieuwe stijl voor de header tags (rechtsboven)
   headerTags: {
     flexDirection: "row",
     alignItems: "center",
@@ -455,7 +508,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginLeft: scale * 5,
-    left: scale * 5,
   },
   mediaContainer: {
     width: scale * 345,
@@ -463,7 +515,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#000",
     marginBottom: scale * 10,
-    height: scale * 450,
+    height: scale * 463,
     alignSelf: "center",
   },
   media: {
@@ -524,7 +576,6 @@ const styles = StyleSheet.create({
     marginTop: scale * 4,
     textDecorationLine: "underline",
   },
-  // Nieuwe onderste container met like/follow links en collab rechts
   bottomContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -536,6 +587,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     right: scale * 12,
+  },
+  leftButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    right: scale * 15,
+  },
+  rightButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    left: scale * 10,
+  },
+  buttonWrapper: {
+    margin: scale * 3,
   },
   postActions: {
     left: scale * 18,

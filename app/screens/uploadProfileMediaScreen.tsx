@@ -130,7 +130,6 @@ const ProfileMediaScreen: React.FC = () => {
     }
   };
 
-  // Functie om audio te selecteren en uploaden (alleen voor afbeeldingen)
   const pickAudio = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({ type: "audio/*" });
@@ -150,20 +149,17 @@ const ProfileMediaScreen: React.FC = () => {
     }
   };
 
-  // Functie om de media (en audio, indien aanwezig) op te slaan in de demos-tabel
   const handleSaveMedia = async () => {
     if (!mediaObject) {
       Alert.alert("Fout", "Er is geen media om op te slaan.");
       return;
     }
-    // Bouw het nieuwe demo-record op
     const newDemo = {
-      profile_id: profile?.id, // Zorg dat dit overeenkomt met je database
+      profile_id: profile?.id,
       media_url: mediaObject.media,
       thumbnail: mediaObject.video_thumbnail ? mediaObject.video_thumbnail : mediaObject.media,
-      audio_url: audioUrl, // Dit veld bevat de audio, indien geüpload (bij afbeeldingen)
+      audio_url: audioUrl,
       timestamp: new Date().toISOString(),
-      // Voeg extra velden toe indien nodig (bijv. description)
     };
 
     const { error } = await supabase
@@ -197,7 +193,6 @@ const ProfileMediaScreen: React.FC = () => {
           />
         </View>
       )}
-      {/* Toon de audio upload-knop alleen als het een afbeelding betreft */}
       {mediaObject && !mediaObject.video_thumbnail && (
         <TouchableOpacity style={styles.uploadBox} onPress={pickAudio}>
           <Text style={styles.uploadText}>Select Audio (optioneel)</Text>
@@ -218,7 +213,14 @@ const ProfileMediaScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 20, backgroundColor: "#121212", alignItems: "center" },
+  // Pas de container aan zodat de inhoud gecentreerd wordt op het scherm
+  container: { 
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#121212",
+    padding: 20,
+  },
   headerText: { color: "white", fontSize: 24, fontWeight: "bold", marginBottom: 20 },
   uploadBox: {
     backgroundColor: "#1E1E1E",

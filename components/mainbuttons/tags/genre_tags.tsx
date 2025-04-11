@@ -21,7 +21,7 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center", // Centreert de inhoud verticaal
-        marginRight: 8,
+        marginRight: 3,
         backgroundColor: "#121212",
         paddingHorizontal: 5,
         paddingVertical: 2,
