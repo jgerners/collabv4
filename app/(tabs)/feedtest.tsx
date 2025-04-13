@@ -21,7 +21,7 @@ import { setCachedAudio } from "../../helpers/audioCache";
 const { width: windowWidth } = Dimensions.get("window");
 const scale = windowWidth / 370;
 // Zorg ervoor dat itemLength de volledige hoogte van een post vertegenwoordigt
-const itemLength = scale * 602;
+const itemLength = scale * 640;
 
 const FeedScreenContent: React.FC = () => {
   const {
@@ -240,7 +240,7 @@ const FeedScreenContent: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#121212" },
+  container: { flex: 1, backgroundColor: "black" },
   loadingContainer: {
     justifyContent: "center",
     alignItems: "center",

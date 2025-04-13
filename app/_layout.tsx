@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
 
   headerBackground: {
     flex: 1,
-    backgroundColor: 'rgba(23, 23, 23, 0.81)',
+    backgroundColor: 'rgba(0, 0, 0, 0.81)',
   },
   loadingContainer: {
     flex: 1,

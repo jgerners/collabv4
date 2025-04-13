@@ -30,6 +30,7 @@ import ArtistTag from "./mainbuttons/tags/artist_tags";
 import GenreTag from "./mainbuttons/tags/genre_tags";
 import ReplayButton from "./mainbuttons/replay";
 import SaveButton from "./mainbuttons/save";
+import Timestamp from "./mainbuttons/timestamp";
 
 // Activeer LayoutAnimation op Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -345,14 +346,20 @@ const PostComponent: React.FC<PostProps> = ({
     };
   }, []);
 
+   // Log de hoogte van de post zodra deze is gerenderd
+   const handleLayout = (event: any) => {
+    const { height } = event.nativeEvent.layout;
+    console.log("Post height:", height);
+  };
+
   return (
-    <View style={styles.postContainer}>
+    <View style={styles.postContainer} onLayout={handleLayout}>
       <View style={styles.postHeader}>
         <View style={styles.profileContainer}>
           <ProfileLink userId={post.userId}>
             <Image
               source={{ uri: post.profileImage }}
-              style={{ width: scale * 30, height: scale * 30, borderRadius: scale * 15 }}
+              style={{ width: scale * 25, height: scale * 25, borderRadius: scale * 15 }}
             />
           </ProfileLink>
           <ProfileLink userId={post.userId}>
@@ -422,8 +429,6 @@ const PostComponent: React.FC<PostProps> = ({
           <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
         )}
 
-      
-
         <View style={styles.controlsContainer}>
           <View style={styles.playButtonContainer}>
             <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
@@ -442,6 +447,7 @@ const PostComponent: React.FC<PostProps> = ({
           </View>
           <ReplayButton onPress={handleReplay} />
         </View>
+
         <View style={styles.infoOverlay}>
           <Text style={styles.postTitle}>{post.title}</Text>
           <Text
@@ -469,6 +475,11 @@ const PostComponent: React.FC<PostProps> = ({
           )}
         </View>
       </Pressable>
+
+      {/* Timestamp net onder de media en boven de actieknoppen */}
+      <View style={styles.timestampContainer}>
+        <Timestamp timestamp={post.timestamp} />
+      </View>
 
       <View style={styles.bottomContainer}>
         <View style={styles.leftButtons}>
@@ -505,12 +516,14 @@ const PostComponent: React.FC<PostProps> = ({
 const styles = StyleSheet.create({
   postContainer: {
     backgroundColor: "#121212",
-    borderRadius: scale * 20,
+    borderRadius: scale * 15,
     padding: scale * 10,
     marginBottom: scale * 20,
-    minHeight: scale * 580,
+    height: scale * 620, // vaste hoogte zodat deze matcht met itemLength in de feed
     width: scale * 365,
     alignSelf: "center",
+    transform: [{ translateY: -25 }], // Dit verplaatst de hele post 20 pixels omhoog.
+ 
   },
   postHeader: {
     flexDirection: "row",
@@ -556,14 +569,13 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#000",
     marginBottom: scale * 10,
-    height: scale * 463,
+    height: scale * 490,
     alignSelf: "center",
   },
   media: {
     width: "100%",
     height: "100%",
   },
-  
   controlsContainer: {
     position: "absolute",
     bottom: scale * 2,
@@ -618,11 +630,16 @@ const styles = StyleSheet.create({
     marginTop: scale * 4,
     textDecorationLine: "underline",
   },
+  timestampContainer: {
+    marginVertical: scale * 5,
+    alignItems: "center",
+    bottom: scale * 8,
+  },
   bottomContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: scale * 10,
+    marginTop: scale * 5,
     paddingHorizontal: scale * 10,
   },
   bottomButtons: {
@@ -634,6 +651,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     right: scale * 15,
+    
   },
   rightButtons: {
     flexDirection: "row",

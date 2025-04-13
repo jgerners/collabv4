@@ -63,7 +63,7 @@ const SaveButton: React.FC<SaveButtonProps> = ({ postId, userId }) => {
 
   return (
     <TouchableOpacity style={styles.button} onPress={handleSaveToggle} disabled={loading}>
-      <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={30} color="white" />
+      <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={25} color="white" />
     </TouchableOpacity>
   );
 };
