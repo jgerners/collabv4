@@ -6,14 +6,20 @@ import {
   TextInput,
   FlatList,
   TouchableOpacity,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   StyleSheet,
+  Animated,
+  Image,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
-import { useRoute } from "@react-navigation/native";
+import { useRoute, useNavigation } from "@react-navigation/native";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../context/authContext";
+import { BlurView } from "expo-blur";
+
+// Maak een Animated variant van de BlurView
+const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
 interface Message {
   id: string;
@@ -25,15 +31,29 @@ interface Message {
 
 const ChatScreen: React.FC = () => {
   const route = useRoute();
-  const { chatId } = route.params as { chatId: string };
+  // Verwacht dat via route.params ook de profieldata wordt meegegeven
+  const { chatId, profileName, profile_pic } = route.params as {
+    chatId: string;
+    profileName: string;
+    profile_pic: string;
+  };
+  const navigation = useNavigation();
   const { user } = useAuth();
   const currentUserId = user?.id || "";
-  
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
+
   const flatListRef = useRef<FlatList>(null);
 
-  // Functie om berichten op te halen
+  // Deze animated value voor de mount-animatie
+  const slideAnim = useRef(new Animated.Value(100)).current;
+  // Deze animated value past de positie van de hele container aan bij toetsenbord-events
+  const keyboardAnim = useRef(new Animated.Value(0)).current;
+  // Combineer de twee animaties zodat ze samen de container transformeren.
+  const combinedTranslate = Animated.add(slideAnim, keyboardAnim);
+
+  // Haal berichten op
   const fetchMessages = async () => {
     const { data, error } = await supabase
       .from("chat_messages")
@@ -51,7 +71,7 @@ const ChatScreen: React.FC = () => {
     fetchMessages();
   }, [chatId]);
 
-  // Realtime abonnement: Luister naar INSERTs in chat_messages voor dit chatId
+  // Realtime abonnement voor nieuwe berichten
   useEffect(() => {
     const subscription = supabase
       .channel("chat_messages_channel")
@@ -64,7 +84,6 @@ const ChatScreen: React.FC = () => {
           filter: `chat_id=eq.'${chatId}'`,
         },
         (payload: any) => {
-          console.log("Realtime insert payload:", payload);
           setMessages((prevMessages) => [...prevMessages, payload.new]);
         }
       )
@@ -75,10 +94,49 @@ const ChatScreen: React.FC = () => {
     };
   }, [chatId]);
 
+  // Voer de slide-in animatie uit bij het mounten
+  useEffect(() => {
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [slideAnim]);
+
+  // Luister naar toetsenbord events en update keyboardAnim voor de gehele container
+  useEffect(() => {
+    const keyboardShowListener = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => {
+        // We trekken een kleine marge (bijv. 25px) af voor een nette speling
+        const offset = e.endCoordinates.height - 25;
+        Animated.timing(keyboardAnim, {
+          toValue: -offset,
+          duration: e.duration || 300,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+    const keyboardHideListener = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      (e) => {
+        Animated.timing(keyboardAnim, {
+          toValue: 0,
+          duration: e?.duration || 300,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    return () => {
+      keyboardShowListener.remove();
+      keyboardHideListener.remove();
+    };
+  }, [keyboardAnim]);
+
   const handleSend = async () => {
     if (inputText.trim().length === 0) return;
 
-    // Verstuur bericht naar de database
     const { error } = await supabase
       .from("chat_messages")
       .insert([
@@ -96,14 +154,7 @@ const ChatScreen: React.FC = () => {
       return;
     }
     setInputText("");
-
-    // Fallback: haal de berichten opnieuw op zodat de UI direct up-to-date is
     fetchMessages();
-
-    // Scroll naar beneden zodat het nieuwe bericht zichtbaar is
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
   };
 
   const renderItem = ({ item }: { item: Message }) => {
@@ -122,24 +173,38 @@ const ChatScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <KeyboardAvoidingView
-          style={styles.keyboardAvoid}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      {/* Custom header */}
+      <View style={styles.customHeader}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
         >
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.messagesContainer}
-            style={styles.flatList}
-          />
-          {/* Invoerbalk */}
+          <Icon name="arrow-back" size={24} color="#FFF" />
+        </TouchableOpacity>
+        <Image
+          source={{ uri: profile_pic }}
+          style={styles.profilePic}
+        />
+        <Text style={styles.headerText}>{profileName}</Text>
+      </View>
+
+      {/* De Animated.View omvat zowel FlatList als invoerbalk, samen verplaatst */}
+      <Animated.View style={[styles.container, { transform: [{ translateY: combinedTranslate }] }]}>
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[styles.messagesContainer, { paddingBottom: 100 }]}
+          onContentSizeChange={() =>
+            flatListRef.current?.scrollToEnd({ animated: true })
+          }
+        />
+        {/* Invoerbalk: absolute gepositioneerd */}
+        <AnimatedBlurView intensity={80} tint="dark" style={styles.inputOverlay}>
           <View style={styles.inputBar}>
             <TouchableOpacity style={styles.iconButton}>
-              <Icon name="musical-notes-outline" size={22} color="#A0A0A0" />
+              <Icon name="musical-notes-outline" size={20} color="#A0A0A0" />
             </TouchableOpacity>
             <TextInput
               style={styles.textInput}
@@ -148,12 +213,14 @@ const ChatScreen: React.FC = () => {
               value={inputText}
               onChangeText={setInputText}
             />
-            <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
-              <Icon name="send" size={22} color="white" />
+            <TouchableOpacity onPress={handleSend} style={styles.sendButtonBubble}>
+              <View style={styles.sendButtonContainer}>
+                <Icon name="send" size={20} color="white" />
+              </View>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
-      </View>
+        </AnimatedBlurView>
+      </Animated.View>
     </SafeAreaView>
   );
 };
@@ -165,19 +232,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#121212",
   },
+  customHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#121212",
+  },
+  backButton: {
+    marginRight: 10,
+  },
+  profilePic: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 10,
+  },
+  headerText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#FFF",
+  },
   container: {
     flex: 1,
-    marginTop: 50, // Pas aan indien nodig
-  },
-  keyboardAvoid: {
-    flex: 1,
-  },
-  flatList: {
-    flex: 1,
+    position: "relative",
   },
   messagesContainer: {
+    flexGrow: 1,
+    justifyContent: "flex-end",
     padding: 16,
-    paddingBottom: 20,
   },
   messageBubble: {
     marginVertical: 5,
@@ -198,32 +280,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "white",
   },
+  inputOverlay: {
+    position: "absolute",
+    left: "4%",
+    right: "4%",
+    bottom: 5,
+    borderRadius: 25,
+    overflow: "hidden",
+  },
   inputBar: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 10,
     borderTopWidth: 1,
-    borderColor: "#252525",
-    backgroundColor: "#1A1A1A",
+    borderColor: "rgba(76, 76, 76, 0.19)",
+    backgroundColor: "rgba(12, 12, 12, 0.43)",
+    borderRadius: 25,
+    borderWidth: 1,
+    width: "100%",
+    height: 50,
+    alignSelf: "center",
   },
   textInput: {
     flex: 1,
-    height: 40,
-    backgroundColor: "#333",
+    height: 30,
+    backgroundColor: "rgba(12, 12, 12, 0.05)",
     borderRadius: 25,
     paddingHorizontal: 15,
     color: "white",
-    fontSize: 16,
-  },
-  sendButton: {
-    marginLeft: 10,
-    backgroundColor: "#8A2BE2",
-    borderRadius: 50,
-    padding: 10,
+    fontSize: 14,
   },
   iconButton: {
     marginRight: 10,
-    padding: 8,
+  },
+  sendButtonBubble: {
+    marginLeft: 10,
+    backgroundColor: "#8A2BE2",
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    width: 60,
+  },
+  sendButtonContainer: {
+    padding: 5,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

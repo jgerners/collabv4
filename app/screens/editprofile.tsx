@@ -6,15 +6,16 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
-  ScrollView,
-  Alert,
+  Alert
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../../context/authContext";
 import Icon from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../../routes";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // Functie om een pre-signed URL op te halen voor profielfoto's
 const getPresignedUrl = async (
@@ -128,92 +129,109 @@ export default function EditProfile() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Edit Profile</Text>
-      </View>
+    <SafeAreaView style={styles.SafeAreaView}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.container}
+        extraScrollHeight={20} // Dit verhoogt wat extra ruimte zodat je zicht op de input houdt
+        enableOnAndroid={true}
+        keyboardOpeningTime={0}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerText}>Edit Profile</Text>
+        </View>
 
-      {/* Profielfoto met edit-icoon */}
-      <View style={styles.profileImageContainer}>
-        <TouchableOpacity onPress={chooseProfilePic}>
-          <Image
-            source={{ uri: profilePic || "https://via.placeholder.com/100" }}
-            style={styles.profileImage}
-          />
-          <View style={styles.editIconOverlay}>
-            <Icon name="pencil" size={16} color="white" />
+        {/* Profielfoto met edit-icoon */}
+        <View style={styles.profileImageContainer}>
+          <TouchableOpacity onPress={chooseProfilePic}>
+            <Image
+              source={{ uri: profilePic || "https://via.placeholder.com/100" }}
+              style={styles.profileImage}
+            />
+            <View style={styles.editIconOverlay}>
+              <Icon name="pencil" size={16} color="white" />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Persoonlijke info */}
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Username</Text>
+          <View style={styles.inputWrapper}>
+            <TextInput style={styles.input} value={username} onChangeText={setUsername} />
+            <Icon name="pencil" size={16} color="#A020F0" style={styles.editIcon} />
           </View>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Display Name</Text>
+          <View style={styles.inputWrapper}>
+            <TextInput style={styles.input} value={displayName} onChangeText={setDisplayName} />
+            <Icon name="pencil" size={16} color="#A020F0" style={styles.editIcon} />
+          </View>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Role</Text>
+          <View style={styles.inputWrapper}>
+            <TextInput style={styles.input} value={role} onChangeText={setRole} />
+            <Icon name="pencil" size={16} color="#A020F0" style={styles.editIcon} />
+          </View>
+        </View>
+
+        <View style={styles.fieldContainer}>
+          <Text style={styles.label}>Bio</Text>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={[styles.input, { height: 80 }]}
+              value={bio}
+              onChangeText={setBio}
+              multiline
+            />
+            <Icon name="pencil" size={16} color="#A020F0" style={styles.editIcon} />
+          </View>
+        </View>
+
+        {/* Contact sectie */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Contact</Text>
+          <View style={styles.fieldContainer}>
+            <Text style={styles.label}>Instagram</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput style={styles.input} placeholder="Instagram URL" placeholderTextColor="#888" />
+              <Icon name="pencil" size={16} color="#A020F0" style={styles.editIcon} />
+            </View>
+          </View>
+          <View style={styles.fieldContainer}>
+            <Text style={styles.label}>Spotify</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput style={styles.input} placeholder="Spotify URL" placeholderTextColor="#888" />
+              <Icon name="pencil" size={16} color="#A020F0" style={styles.editIcon} />
+            </View>
+          </View>
+        </View>
+
+        {/* Save Button */}
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+          <Text style={styles.saveButtonText}>{uploading ? "Uploading..." : "Save Profile"}</Text>
         </TouchableOpacity>
-      </View>
-
-      {/* Persoonlijke info */}
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Username</Text>
-        <View style={styles.inputWrapper}>
-          <TextInput style={styles.input} value={username} onChangeText={setUsername} />
-          <Icon name="pencil" size={16} color="#A020F0" style={styles.editIcon} />
-        </View>
-      </View>
-      
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Display Name</Text>
-        <View style={styles.inputWrapper}>
-          <TextInput style={styles.input} value={displayName} onChangeText={setDisplayName} />
-          <Icon name="pencil" size={16} color="#A020F0" style={styles.editIcon} />
-        </View>
-      </View>
-      
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Role</Text>
-        <View style={styles.inputWrapper}>
-          <TextInput style={styles.input} value={role} onChangeText={setRole} />
-          <Icon name="pencil" size={16} color="#A020F0" style={styles.editIcon} />
-        </View>
-      </View>
-      
-      <View style={styles.fieldContainer}>
-        <Text style={styles.label}>Bio</Text>
-        <View style={styles.inputWrapper}>
-          <TextInput
-            style={[styles.input, { height: 80 }]}
-            value={bio}
-            onChangeText={setBio}
-            multiline
-          />
-          <Icon name="pencil" size={16} color="#A020F0" style={styles.editIcon} />
-        </View>
-      </View>
-
-      {/* Contact sectie */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Contact</Text>
-        <View style={styles.fieldContainer}>
-          <Text style={styles.label}>Instagram</Text>
-          <View style={styles.inputWrapper}>
-            <TextInput style={styles.input} placeholder="Instagram URL" placeholderTextColor="#888" />
-            <Icon name="pencil" size={16} color="#A020F0" style={styles.editIcon} />
-          </View>
-        </View>
-        <View style={styles.fieldContainer}>
-          <Text style={styles.label}>Spotify</Text>
-          <View style={styles.inputWrapper}>
-            <TextInput style={styles.input} placeholder="Spotify URL" placeholderTextColor="#888" />
-            <Icon name="pencil" size={16} color="#A020F0" style={styles.editIcon} />
-          </View>
-        </View>
-      </View>
-
-      {/* Save Button */}
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>{uploading ? "Uploading..." : "Save Profile"}</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      </KeyboardAwareScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, backgroundColor: "#121212", alignItems: "center" },
+  SafeAreaView: {
+    flex: 1,
+    backgroundColor: "#121212", // Zorgt voor een egale achtergrond (ook bovenaan)
+  },
+  container: {
+    padding: 20,
+    backgroundColor: "#121212",
+    alignItems: "center",
+    flexGrow: 1,
+   
+  },
   header: { marginBottom: 20 },
   headerText: { color: "white", fontSize: 24, fontWeight: "bold" },
   profileImageContainer: {
@@ -257,5 +275,3 @@ const styles = StyleSheet.create({
   },
   saveButtonText: { color: "white", fontSize: 16, fontWeight: "bold" },
 });
-
-

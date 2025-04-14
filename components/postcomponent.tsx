@@ -614,10 +614,16 @@ const styles = StyleSheet.create({
     fontSize: scale * 16,
     fontWeight: "bold",
     marginBottom: scale * 5,
+    textShadowColor: "#000", // Zwarte schaduw
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 1,
   },
   postDescription: {
     color: "white",
     fontSize: scale * 14,
+    textShadowColor: "#000", // Zwarte schaduw
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 1,
   },
   hiddenText: {
     position: "absolute",
