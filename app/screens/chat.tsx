@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+// ChatScreen.tsx
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   SafeAreaView,
   View,
@@ -18,21 +19,16 @@ import { useAuth } from "../../context/authContext";
 import { BlurView } from "expo-blur";
 import useChatMessages, { ChatMessage } from "../../hooks/useChatMessages";
 
-// Maak een Animated variant van de BlurView
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
-/** 
- * Component voor individuele berichten met slide & fade in animatie.
- * Hiermee komt elk bericht vloeiend in beeld.
- */
 interface AnimatedMessageProps {
   message: string;
   isCurrentUser: boolean;
 }
 
 const AnimatedMessage: React.FC<AnimatedMessageProps> = ({ message, isCurrentUser }) => {
-  const slideAnim = useRef(new Animated.Value(50)).current; // Begin 50px lager
-  const opacityAnim = useRef(new Animated.Value(0)).current; // Begin onzichtbaar
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -71,7 +67,6 @@ const AnimatedMessage: React.FC<AnimatedMessageProps> = ({ message, isCurrentUse
 };
 
 const ChatScreen: React.FC = () => {
-  // Verkrijg route-parameters: chatId, profileName en profile_pic
   const route = useRoute();
   const { chatId, profileName, profile_pic } = route.params as {
     chatId: string;
@@ -83,17 +78,19 @@ const ChatScreen: React.FC = () => {
   const { user } = useAuth();
   const currentUserId = user?.id || "";
 
-  // Gebruik de useChatMessages hook
+  // Gebruik de aangepaste useChatMessages-hook (met socket.io realtime)
   const { messages, loading, error, refetch, sendMessage } = useChatMessages(chatId);
   const [inputText, setInputText] = useState("");
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
-  // Animated waarden voor mount-animatie en toetsenbord events
+  // Scroll-gerelateerde variabelen
+  const [containerHeight, setContainerHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const safeMargin = 50;
   const slideAnim = useRef(new Animated.Value(100)).current;
   const keyboardAnim = useRef(new Animated.Value(0)).current;
   const combinedTranslate = Animated.add(slideAnim, keyboardAnim);
 
-  // Slide-in animatie bij mount
   useEffect(() => {
     Animated.timing(slideAnim, {
       toValue: 0,
@@ -102,7 +99,6 @@ const ChatScreen: React.FC = () => {
     }).start();
   }, [slideAnim]);
 
-  // Luister naar toetsenbord events en pas de container aan
   useEffect(() => {
     const keyboardShowListener = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
@@ -131,42 +127,54 @@ const ChatScreen: React.FC = () => {
     };
   }, [keyboardAnim]);
 
-  // Handler voor het versturen van berichten via de hook
   const handleSend = async () => {
     if (inputText.trim().length === 0) return;
-
+    console.log("[ChatScreen] Verzend bericht:", inputText);
     const response = await sendMessage({
       sender_id: currentUserId,
       message: inputText,
     });
-
     if (response.error) {
-      console.error("Error sending message:", response.error);
+      console.error("[ChatScreen] Fout bij versturen bericht:", response.error);
       return;
     }
-    console.log("Message sent:", response.data);
+    console.log("[ChatScreen] Bericht verzonden, reactie:", response.data);
     setInputText("");
-
-    // Scroll naar het einde zodat het nieuwe bericht zichtbaar is
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
   };
 
-  // Sorteer berichten op basis van created_at, zodat ze chronologisch getoond worden
-  const sortedMessages = [...messages].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
+  const sortedMessages = useMemo(() => {
+    console.log("[ChatScreen] Sorting messages, aantal berichten:", messages.length);
+    return [...messages].sort(
+      (a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+  }, [messages]);
 
-  // Render een bericht met de AnimatedMessage component
+  useEffect(() => {
+    if (containerHeight === 0 || contentHeight === 0) return;
+    const targetOffset = contentHeight - containerHeight - safeMargin;
+    console.log("[ChatScreen] Auto scroll (zonder animatie) naar offset:", targetOffset);
+    flatListRef.current?.scrollToOffset({ offset: targetOffset, animated: false });
+  }, [sortedMessages, containerHeight, contentHeight]);
+
+  const handleContentSizeChange = (width: number, height: number) => {
+    console.log("[ChatScreen] ContentSizeChange: height =", height);
+    setContentHeight(height);
+  };
+
+  const handleContainerLayout = (event: any) => {
+    console.log("[ChatScreen] Container layout:", event.nativeEvent.layout);
+    setContainerHeight(event.nativeEvent.layout.height);
+  };
+
   const renderItem = ({ item }: { item: ChatMessage }) => {
     const isCurrentUser = item.sender_id === currentUserId;
+    console.log("[ChatScreen] Render item:", item.id, "isCurrentUser:", isCurrentUser);
     return <AnimatedMessage message={item.message} isCurrentUser={isCurrentUser} />;
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header met back-knop, profielfoto en naam */}
       <View style={styles.customHeader}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-back" size={24} color="#FFF" />
@@ -175,18 +183,21 @@ const ChatScreen: React.FC = () => {
         <Text style={styles.headerText}>{profileName}</Text>
       </View>
 
-      {/* Animated container voor chatlijst en invoerbalk */}
-      <Animated.View style={[styles.container, { transform: [{ translateY: combinedTranslate }] }]}>
+      <Animated.View
+        style={[styles.container, { transform: [{ translateY: combinedTranslate }] }]}
+        onLayout={handleContainerLayout}
+      >
         <FlatList
           ref={flatListRef}
+          key={`flatlist-${sortedMessages.length}`}
           data={sortedMessages}
+          extraData={sortedMessages}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[styles.messagesContainer, { paddingBottom: 100 }]}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           style={styles.flatList}
+          onContentSizeChange={handleContentSizeChange}
         />
-        {/* Invoerbalk met BlurView */}
         <AnimatedBlurView intensity={80} tint="dark" style={styles.inputOverlay}>
           <View style={styles.inputBar}>
             <TouchableOpacity style={styles.iconButton}>

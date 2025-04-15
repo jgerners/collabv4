@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabaseClient";
+import io from "socket.io-client";
 
 export interface ChatMessage {
   id: string;
@@ -9,18 +10,22 @@ export interface ChatMessage {
   created_at: string;
 }
 
-// Nieuwe definitie voor een nieuw bericht (zonder id en created_at)
 export type NewChatMessage = {
   sender_id: string;
   message: string;
 };
+
+const SOCKET_SERVER_URL = "http://192.168.178.94:3000"; // Pas dit aan
 
 export const useChatMessages = (chatId: string) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Ophalen van bestaande berichten
+  // Bewaar de socket referentie
+  const socketRef = useRef<any>(null);
+
+  // Initiële data-fetch van de chatgeschiedenis
   const fetchMessages = async () => {
     console.log("[useChatMessages] Fetching messages for chatId:", chatId);
     const { data, error } = await supabase
@@ -32,7 +37,7 @@ export const useChatMessages = (chatId: string) => {
       console.error("[useChatMessages] Error fetching messages:", error.message);
       setError(error.message);
     } else if (data) {
-      console.log("[useChatMessages] Messages fetched:", data);
+      console.log("[useChatMessages] Messages fetched:", data.length);
       setMessages(data as ChatMessage[]);
     }
     setLoading(false);
@@ -40,67 +45,48 @@ export const useChatMessages = (chatId: string) => {
 
   useEffect(() => {
     if (!chatId) return;
-
-    // Eerste fetch
     fetchMessages();
+  }, [chatId]);
 
-    console.log("[useChatMessages] Setting up realtime subscription for chatId:", chatId);
-    const subscription = supabase
-      .channel("chat_messages_channel")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_messages",
-          filter: `chat_id=eq.${chatId}`,
-        },
-        (payload: any) => {
-          console.log("[useChatMessages] (DEBUG) Realtime payload received:", payload);
-          setMessages((prev) => {
-            // Verwijder eerst eventuele tijdelijke berichten die overeenkomen
-            let newMessages = prev.filter(
-              (msg) =>
-                !(msg.id.startsWith("temp-") &&
-                  msg.sender_id === payload.new.sender_id &&
-                  msg.message === payload.new.message)
+  // Socket.io initialisatie, join de room en luister naar realtime updates
+  useEffect(() => {
+    const socket = io(SOCKET_SERVER_URL, { transports: ["websocket"] });
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      console.log("[useChatMessages] Socket connected:", socket.id);
+      socket.emit("joinChat", chatId);
+    });
+
+    socket.on("chatMessage", (data: ChatMessage) => {
+      console.log("[useChatMessages] Socket ontvangt bericht:", data);
+      if (data.chat_id === chatId) {
+        setMessages((prev) => {
+          if (!prev.find((msg) => msg.id === data.id)) {
+            const updated = [...prev, data];
+            updated.sort(
+              (a, b) =>
+                new Date(a.created_at).getTime() -
+                new Date(b.created_at).getTime()
             );
-            // Voeg het nieuwe bericht toe als het nog niet voorkomt
-            if (!newMessages.find((msg) => msg.id === payload.new.id)) {
-              newMessages.push(payload.new);
-            }
-            // Sorteer altijd op created_at (chronologisch)
-            newMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-            return newMessages;
-          });
-        }
-      )
-      .subscribe();
-
-    console.log("[useChatMessages] Realtime subscription set up:", subscription);
+            return updated;
+          }
+          return prev;
+        });
+      }
+    });
 
     return () => {
-      console.log("[useChatMessages] Removing realtime subscription for chatId:", chatId);
-      supabase.removeChannel(subscription);
+      socket.disconnect();
+      console.log("[useChatMessages] Socket disconnected");
     };
   }, [chatId]);
 
-  // Optimistische sendMessage functie
+  // Verstuur bericht: insert naar Supabase en daarna emit via socket
   const sendMessage = async (newMessage: NewChatMessage) => {
     console.log("[useChatMessages] Sending message:", newMessage);
-    // Maak een tijdelijk bericht met een tijdelijke ID
-    const tempId = "temp-" + new Date().getTime();
-    const temporaryMessage: ChatMessage = {
-      id: tempId,
-      chat_id: chatId,
-      sender_id: newMessage.sender_id,
-      message: newMessage.message,
-      created_at: new Date().toISOString(),
-    };
-
-    // Voeg het tijdelijke bericht meteen toe
-    setMessages((prev) => [...prev, temporaryMessage]);
-
+    
+    // Insert het bericht naar de database
     const { data, error } = await supabase
       .from("chat_messages")
       .insert([
@@ -112,20 +98,34 @@ export const useChatMessages = (chatId: string) => {
         },
       ])
       .select("*");
+
     if (error) {
       console.error("[useChatMessages] Error sending message:", error.message);
-      // Verwijder het tijdelijke bericht als er een error is
-      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
       return { error };
     }
-    console.log("[useChatMessages] Message sent, response:", data);
-    // Verwijder het tijdelijke bericht en voeg het echte bericht toe
+
+    console.log("[useChatMessages] Message sent successfully, response:", data);
+    const insertedMessage = (data as ChatMessage[])[0];
+
+    // Emit het volledige bericht via socket
+    if (socketRef.current) {
+      socketRef.current.emit("chatMessage", insertedMessage);
+      console.log("[useChatMessages] Emitted chatMessage via socket:", insertedMessage);
+    }
+
     setMessages((prev) => {
-      const filtered = prev.filter((msg) => msg.id !== tempId);
-      return [...filtered, ...(data as ChatMessage[])].sort(
-        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      );
+      if (!prev.find((msg) => msg.id === insertedMessage.id)) {
+        const updated = [...prev, insertedMessage];
+        updated.sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() -
+            new Date(b.created_at).getTime()
+        );
+        return updated;
+      }
+      return prev;
     });
+
     return { data };
   };
 
