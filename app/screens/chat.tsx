@@ -14,87 +14,86 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../context/authContext";
 import { BlurView } from "expo-blur";
+import useChatMessages, { ChatMessage } from "../../hooks/useChatMessages";
 
 // Maak een Animated variant van de BlurView
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
-interface Message {
-  id: string;
-  chat_id: string;
-  sender_id: string;
+/** 
+ * Component voor individuele berichten met slide & fade in animatie.
+ * Hiermee komt elk bericht vloeiend in beeld.
+ */
+interface AnimatedMessageProps {
   message: string;
-  created_at: string;
+  isCurrentUser: boolean;
 }
 
+const AnimatedMessage: React.FC<AnimatedMessageProps> = ({ message, isCurrentUser }) => {
+  const slideAnim = useRef(new Animated.Value(50)).current; // Begin 50px lager
+  const opacityAnim = useRef(new Animated.Value(0)).current; // Begin onzichtbaar
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [slideAnim, opacityAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          transform: [{ translateY: slideAnim }],
+          opacity: opacityAnim,
+          marginVertical: 5,
+          paddingVertical: 12,
+          paddingHorizontal: 15,
+          borderRadius: 20,
+          maxWidth: "75%",
+          backgroundColor: isCurrentUser ? "#8A2BE2" : "#252525",
+          alignSelf: isCurrentUser ? "flex-end" : "flex-start",
+        },
+      ]}
+    >
+      <Text style={styles.messageText}>{message}</Text>
+    </Animated.View>
+  );
+};
+
 const ChatScreen: React.FC = () => {
+  // Verkrijg route-parameters: chatId, profileName en profile_pic
   const route = useRoute();
-  // Verwacht dat via route.params ook de profieldata wordt meegegeven
   const { chatId, profileName, profile_pic } = route.params as {
     chatId: string;
     profileName: string;
     profile_pic: string;
   };
+
   const navigation = useNavigation();
   const { user } = useAuth();
   const currentUserId = user?.id || "";
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Gebruik de useChatMessages hook
+  const { messages, loading, error, refetch, sendMessage } = useChatMessages(chatId);
   const [inputText, setInputText] = useState("");
+  const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
-  const flatListRef = useRef<FlatList>(null);
-
-  // Deze animated value voor de mount-animatie
+  // Animated waarden voor mount-animatie en toetsenbord events
   const slideAnim = useRef(new Animated.Value(100)).current;
-  // Deze animated value past de positie van de hele container aan bij toetsenbord-events
   const keyboardAnim = useRef(new Animated.Value(0)).current;
-  // Combineer de twee animaties zodat ze samen de container transformeren.
   const combinedTranslate = Animated.add(slideAnim, keyboardAnim);
 
-  // Haal berichten op
-  const fetchMessages = async () => {
-    const { data, error } = await supabase
-      .from("chat_messages")
-      .select("*")
-      .eq("chat_id", chatId)
-      .order("created_at", { ascending: true });
-    if (error) {
-      console.error("Error fetching messages:", error);
-    } else if (data) {
-      setMessages(data as Message[]);
-    }
-  };
-
-  useEffect(() => {
-    fetchMessages();
-  }, [chatId]);
-
-  // Realtime abonnement voor nieuwe berichten
-  useEffect(() => {
-    const subscription = supabase
-      .channel("chat_messages_channel")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_messages",
-          filter: `chat_id=eq.'${chatId}'`,
-        },
-        (payload: any) => {
-          setMessages((prevMessages) => [...prevMessages, payload.new]);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, [chatId]);
-
-  // Voer de slide-in animatie uit bij het mounten
+  // Slide-in animatie bij mount
   useEffect(() => {
     Animated.timing(slideAnim, {
       toValue: 0,
@@ -103,12 +102,11 @@ const ChatScreen: React.FC = () => {
     }).start();
   }, [slideAnim]);
 
-  // Luister naar toetsenbord events en update keyboardAnim voor de gehele container
+  // Luister naar toetsenbord events en pas de container aan
   useEffect(() => {
     const keyboardShowListener = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
       (e) => {
-        // We trekken een kleine marge (bijv. 25px) af voor een nette speling
         const offset = e.endCoordinates.height - 25;
         Animated.timing(keyboardAnim, {
           toValue: -offset,
@@ -127,80 +125,68 @@ const ChatScreen: React.FC = () => {
         }).start();
       }
     );
-
     return () => {
       keyboardShowListener.remove();
       keyboardHideListener.remove();
     };
   }, [keyboardAnim]);
 
+  // Handler voor het versturen van berichten via de hook
   const handleSend = async () => {
     if (inputText.trim().length === 0) return;
 
-    const { error } = await supabase
-      .from("chat_messages")
-      .insert([
-        {
-          chat_id: chatId,
-          sender_id: currentUserId,
-          message: inputText,
-          created_at: new Date().toISOString(),
-        },
-      ])
-      .select("*");
+    const response = await sendMessage({
+      sender_id: currentUserId,
+      message: inputText,
+    });
 
-    if (error) {
-      console.error("Error sending message:", error);
+    if (response.error) {
+      console.error("Error sending message:", response.error);
       return;
     }
+    console.log("Message sent:", response.data);
     setInputText("");
-    fetchMessages();
+
+    // Scroll naar het einde zodat het nieuwe bericht zichtbaar is
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
   };
 
-  const renderItem = ({ item }: { item: Message }) => {
+  // Sorteer berichten op basis van created_at, zodat ze chronologisch getoond worden
+  const sortedMessages = [...messages].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  // Render een bericht met de AnimatedMessage component
+  const renderItem = ({ item }: { item: ChatMessage }) => {
     const isCurrentUser = item.sender_id === currentUserId;
-    return (
-      <View
-        style={[
-          styles.messageBubble,
-          isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble,
-        ]}
-      >
-        <Text style={styles.messageText}>{item.message}</Text>
-      </View>
-    );
+    return <AnimatedMessage message={item.message} isCurrentUser={isCurrentUser} />;
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Custom header */}
+      {/* Header met back-knop, profielfoto en naam */}
       <View style={styles.customHeader}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Icon name="arrow-back" size={24} color="#FFF" />
         </TouchableOpacity>
-        <Image
-          source={{ uri: profile_pic }}
-          style={styles.profilePic}
-        />
+        <Image source={{ uri: profile_pic }} style={styles.profilePic} />
         <Text style={styles.headerText}>{profileName}</Text>
       </View>
 
-      {/* De Animated.View omvat zowel FlatList als invoerbalk, samen verplaatst */}
+      {/* Animated container voor chatlijst en invoerbalk */}
       <Animated.View style={[styles.container, { transform: [{ translateY: combinedTranslate }] }]}>
         <FlatList
           ref={flatListRef}
-          data={messages}
+          data={sortedMessages}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={[styles.messagesContainer, { paddingBottom: 100 }]}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: true })
-          }
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          style={styles.flatList}
         />
-        {/* Invoerbalk: absolute gepositioneerd */}
+        {/* Invoerbalk met BlurView */}
         <AnimatedBlurView intensity={80} tint="dark" style={styles.inputOverlay}>
           <View style={styles.inputBar}>
             <TouchableOpacity style={styles.iconButton}>
@@ -261,20 +247,8 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     padding: 16,
   },
-  messageBubble: {
-    marginVertical: 5,
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    maxWidth: "75%",
-  },
-  currentUserBubble: {
-    backgroundColor: "#8A2BE2",
-    alignSelf: "flex-end",
-  },
-  otherUserBubble: {
-    backgroundColor: "#252525",
-    alignSelf: "flex-start",
+  flatList: {
+    flex: 1,
   },
   messageText: {
     fontSize: 16,

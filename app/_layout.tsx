@@ -121,7 +121,7 @@ function AuthNavigator() {
             name="Chat" 
             component={ChatScreen}
             options={{
-              headerShown: false,
+              headerShown: true,
               headerTitle: "Chat",
               headerBackTitle: "",
               headerTintColor: "white",
