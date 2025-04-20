@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center", // Centreert de inhoud verticaal
         marginRight: 3,
-        backgroundColor: "#121212",
+        backgroundColor: "black",
         paddingHorizontal: 5,
         paddingVertical: 2,
         borderRadius: 10,

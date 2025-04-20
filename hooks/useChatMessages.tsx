@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "../supabaseClient";
 import io from "socket.io-client";
+import { useFocusEffect } from "@react-navigation/native";
 
 export interface ChatMessage {
   id: string;
@@ -15,7 +16,7 @@ export type NewChatMessage = {
   message: string;
 };
 
-const SOCKET_SERVER_URL = "http://192.168.178.94:3000"; // Pas dit aan
+const SOCKET_SERVER_URL = "http://192.168.178.145:3000"; // Pas dit aan indien nodig
 
 export const useChatMessages = (chatId: string) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -25,49 +26,66 @@ export const useChatMessages = (chatId: string) => {
   // Bewaar de socket referentie
   const socketRef = useRef<any>(null);
 
-  // Initiële data-fetch van de chatgeschiedenis
+  // Functie voor het ophalen van de chatgeschiedenis
   const fetchMessages = async () => {
-    console.log("[useChatMessages] Fetching messages for chatId:", chatId);
+    if (!chatId) return;
+    
+  
     const { data, error } = await supabase
       .from("chat_messages")
       .select("*")
       .eq("chat_id", chatId)
       .order("created_at", { ascending: true });
+
+      console.log("[useChatMessages] Aantal opgehaalde berichten:", data?.length);
+
+
     if (error) {
-      console.error("[useChatMessages] Error fetching messages:", error.message);
+
       setError(error.message);
     } else if (data) {
-      console.log("[useChatMessages] Messages fetched:", data.length);
+  
       setMessages(data as ChatMessage[]);
     }
     setLoading(false);
   };
 
+  // Initiale data-fetch bij mount of wanneer chatId verandert
   useEffect(() => {
     if (!chatId) return;
     fetchMessages();
   }, [chatId]);
 
-  // Socket.io initialisatie, join de room en luister naar realtime updates
+  // Gebruik useFocusEffect om de chatgeschiedenis opnieuw op te halen zodra de chat in focus komt.
+  useFocusEffect(
+    useCallback(() => {
+      if (chatId) {
+
+        fetchMessages();
+      }
+    }, [chatId])
+  );
+
+  // Socket.io initialisatie: maak verbinding, join de chatroom en luister naar realtime updates.
   useEffect(() => {
+    if (!chatId) return;
     const socket = io(SOCKET_SERVER_URL, { transports: ["websocket"] });
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("[useChatMessages] Socket connected:", socket.id);
+
       socket.emit("joinChat", chatId);
     });
 
     socket.on("chatMessage", (data: ChatMessage) => {
-      console.log("[useChatMessages] Socket ontvangt bericht:", data);
+    
       if (data.chat_id === chatId) {
         setMessages((prev) => {
           if (!prev.find((msg) => msg.id === data.id)) {
             const updated = [...prev, data];
             updated.sort(
               (a, b) =>
-                new Date(a.created_at).getTime() -
-                new Date(b.created_at).getTime()
+                new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             );
             return updated;
           }
@@ -78,13 +96,13 @@ export const useChatMessages = (chatId: string) => {
 
     return () => {
       socket.disconnect();
-      console.log("[useChatMessages] Socket disconnected");
+    
     };
   }, [chatId]);
 
-  // Verstuur bericht: insert naar Supabase en daarna emit via socket
+  // Verstuur een nieuw bericht: insert naar Supabase en emit via socket
   const sendMessage = async (newMessage: NewChatMessage) => {
-    console.log("[useChatMessages] Sending message:", newMessage);
+    
     
     // Insert het bericht naar de database
     const { data, error } = await supabase
@@ -100,26 +118,26 @@ export const useChatMessages = (chatId: string) => {
       .select("*");
 
     if (error) {
-      console.error("[useChatMessages] Error sending message:", error.message);
+
       return { error };
     }
 
-    console.log("[useChatMessages] Message sent successfully, response:", data);
+
     const insertedMessage = (data as ChatMessage[])[0];
 
-    // Emit het volledige bericht via socket
+    // Emit het bericht via socket
     if (socketRef.current) {
       socketRef.current.emit("chatMessage", insertedMessage);
-      console.log("[useChatMessages] Emitted chatMessage via socket:", insertedMessage);
+      
     }
 
+    // Update de lokale state met het nieuwe bericht
     setMessages((prev) => {
       if (!prev.find((msg) => msg.id === insertedMessage.id)) {
         const updated = [...prev, insertedMessage];
         updated.sort(
           (a, b) =>
-            new Date(a.created_at).getTime() -
-            new Date(b.created_at).getTime()
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
         return updated;
       }

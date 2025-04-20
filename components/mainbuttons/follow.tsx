@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
   },
   // Toevoeging van nieuwe stijlen
   following: {
-    backgroundColor: "#121212", // Paars
+    backgroundColor: "black", // Paars
     borderWidth: 1,               // Dunne rand
     borderColor: "white",         // Witte rand
   },
@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     color: "white",  // Witte tekst
   },
   notFollowing: {
-    backgroundColor: "#121212",  // Zwarte achtergrond zoals de post
+    backgroundColor: "black",  // Zwarte achtergrond zoals de post
     borderWidth: 1,               // Dunne rand
     borderColor: "white",         // Witte rand
   },

@@ -240,7 +240,7 @@ const FeedScreenContent: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "black" },
+  container: { flex: 1, backgroundColor: "#121212" },
   loadingContainer: {
     justifyContent: "center",
     alignItems: "center",
