@@ -21,10 +21,10 @@ import { setCachedAudio } from "../../helpers/audioCache";
 import { useLayoutEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 
-const { width: windowWidth } = Dimensions.get("window");
+const { width: windowWidth, height: windowHeight } = Dimensions.get("window");
+// nu één item = volledige device‐hoogte
+const itemLength = windowHeight;
 const scale = windowWidth / 370;
-// Zorg ervoor dat itemLength de volledige hoogte van een post vertegenwoordigt
-const itemLength = scale * 640;
 
 const FeedScreenContent: React.FC = () => {
   const {
@@ -227,7 +227,7 @@ const FeedScreenContent: React.FC = () => {
         snapToInterval={itemLength}
         pagingEnabled
         disableIntervalMomentum={true}  // Deze prop zorgt ervoor dat maar 1 post per keer wordt gescrold
-        ListHeaderComponent={<View style={{ height: scale * 125 }} />}
+        
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         onEndReached={handleEndReached}

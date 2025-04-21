@@ -28,9 +28,9 @@ export default function LoginScreen() {
       <TextInput style={styles.input} placeholder="Wachtwoord" secureTextEntry onChangeText={setPassword} />
       <Button title="Login" onPress={handleLogin} />
       <Text style={styles.registerText}>
-        Nog geen account?{" "}
+        No account?{" "}
         <Text style={styles.registerLink} onPress={() => navigation.navigate("Register")}>
-          Registreer hier
+          Register here
         </Text>
       </Text>
     </View>

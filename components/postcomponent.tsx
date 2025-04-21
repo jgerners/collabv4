@@ -18,7 +18,9 @@ import { useAuth } from "../context/authContext";
 import Slider from "@react-native-community/slider";
 import { setCurrentPlayingMedia, stopCurrentMedia } from "../PlaybackManager";
 
-import { BlurView } from 'expo-blur';
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
+
 
 // Importeer de audio cache helper
 import { getCachedAudio, setCachedAudio } from "../helpers/audioCache";
@@ -35,11 +37,14 @@ import SaveButton from "./mainbuttons/save";
 import Timestamp from "./mainbuttons/timestamp";
 
 // Activeer LayoutAnimation op Android
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const { width: windowWidth } = Dimensions.get("window");
+const { width: windowWidth, height: windowHeight } = Dimensions.get("window");
 const scale = windowWidth / 370;
 
 export interface ArtistTagData {
@@ -79,7 +84,7 @@ interface PostProps {
   post: PostData;
   artistTags: ArtistTagData[];
   genreTags: GenreTagData[];
-  isActive: boolean;    // Geeft aan of de post automatisch moet afspelen
+  isActive: boolean; // Geeft aan of de post automatisch moet afspelen
   feedFocused: boolean; // Geeft aan of de feed in focus is
   withinPreloadRange: boolean; // Indicator, maar niet meer actief gebruikt
 }
@@ -154,7 +159,10 @@ const PostComponent: React.FC<PostProps> = ({
     setDescriptionExpanded(!descriptionExpanded);
   };
 
-  const retryPlayAudio = async (sound: Audio.Sound, retries: number = 3): Promise<void> => {
+  const retryPlayAudio = async (
+    sound: Audio.Sound,
+    retries: number = 3
+  ): Promise<void> => {
     for (let i = 0; i < retries; i++) {
       try {
         const status = await sound.getStatusAsync();
@@ -162,9 +170,7 @@ const PostComponent: React.FC<PostProps> = ({
           await sound.playAsync();
           return;
         }
-      } catch (error) {
-        // Retry indien nodig
-      }
+      } catch (error) {}
       await new Promise((resolve) => setTimeout(resolve, 300));
     }
   };
@@ -191,7 +197,6 @@ const PostComponent: React.FC<PostProps> = ({
           if (reset) {
             await sound.setPositionAsync(0);
           }
-          // Stel de status-update callback in zodat de seekbar werkt
           sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
           await sound.playAsync();
         }
@@ -218,9 +223,7 @@ const PostComponent: React.FC<PostProps> = ({
     }
   }, [post.mediaType]);
 
-  // Auto-play effect: wanneer de post actief is en de feed gefocust is,
-  // proberen we de media te starten. Indien er al een audio-instantie bestaat,
-  // controleren we eerst of deze geladen is en of er al een positie is.
+  // Auto-play effect
   useEffect(() => {
     const managePlayback = async () => {
       if (isActive && feedFocused) {
@@ -232,43 +235,43 @@ const PostComponent: React.FC<PostProps> = ({
           let sound = getCachedAudio(post.id);
           if (sound) {
             const status = await sound.getStatusAsync();
-            if (status.isLoaded) {
-              // Als de audio al een positie heeft (dus niet 0), hervatten met reset = false,
-              // anders starten we vanaf het begin (reset = true)
-              const shouldReset = status.positionMillis === 0;
-              await playAudio(shouldReset);
-            } else {
-              await playAudio(true);
-            }
+            const shouldReset = status.isLoaded
+              ? status.positionMillis === 0
+              : true;
+            await playAudio(shouldReset);
           } else {
             await playAudio(true);
           }
         }
         hasAutoPlayedRef.current = true;
       } else {
-        // Als de feed gefocust blijft en de post niet actief is (bij scrollen),
-        // pauzeren we de media EN resetten we de positie.
         if (feedFocused) {
           if (post.mediaType === "video" && videoRef.current) {
             awaitOrIgnore(() => videoRef.current!.pauseAsync());
             awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
             setIsPlaying(false);
-          } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+          } else if (
+            post.mediaType === "photo" &&
+            post.audio &&
+            audioRef.current
+          ) {
             awaitOrIgnore(() => audioRef.current!.pauseAsync());
             awaitOrIgnore(() => audioRef.current!.setPositionAsync(0));
             setIsPlaying(false);
           }
         } else {
-          // Als de feed niet gefocust is (navigatie weg), pauzeren we maar laten we de positie behouden.
           if (post.mediaType === "video" && videoRef.current) {
             awaitOrIgnore(() => videoRef.current!.pauseAsync());
             setIsPlaying(false);
-          } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+          } else if (
+            post.mediaType === "photo" &&
+            post.audio &&
+            audioRef.current
+          ) {
             awaitOrIgnore(() => audioRef.current!.pauseAsync());
             setIsPlaying(false);
           }
         }
-        // Reset de auto-play flag als de post niet langer actief is.
         hasAutoPlayedRef.current = false;
       }
     };
@@ -276,7 +279,7 @@ const PostComponent: React.FC<PostProps> = ({
     managePlayback();
   }, [isActive, feedFocused]);
 
-  // Handmatige play/pause: direct de audio besturen zonder positie-reset.
+  // Handmatige play/pause
   const handlePlayPause = async () => {
     if (post.mediaType === "video" && videoRef.current) {
       if (isPlaying) {
@@ -291,15 +294,11 @@ const PostComponent: React.FC<PostProps> = ({
     } else if (post.mediaType === "photo" && post.audio) {
       if (audioRef.current) {
         if (isPlaying) {
-          try {
-            await audioRef.current.pauseAsync();
-          } catch (error) {}
+          await audioRef.current.pauseAsync();
           setIsPlaying(false);
           setManualPaused(true);
         } else {
-          try {
-            await audioRef.current.playAsync();
-          } catch (error) {}
+          await audioRef.current.playAsync();
           setIsPlaying(true);
           setManualPaused(false);
         }
@@ -307,7 +306,7 @@ const PostComponent: React.FC<PostProps> = ({
     }
   };
 
-  // Seekbar-handler: pas de positie aan zonder automatische reset.
+  // Seekbar-handler
   const handleSlidingComplete = async (value: number) => {
     const newPosition = value * duration;
     if (post.mediaType === "video" && videoRef.current) {
@@ -322,7 +321,7 @@ const PostComponent: React.FC<PostProps> = ({
     }
   };
 
-  // Replay: reset positie naar 0 en start opnieuw af (auto-play met reset = true)
+  // Replay
   const handleReplay = async () => {
     if (post.mediaType === "video" && videoRef.current) {
       awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
@@ -335,8 +334,7 @@ const PostComponent: React.FC<PostProps> = ({
     }
   };
 
-  // Cleanup: bij unmount pauzeren we de media maar resetten we de positie niet,
-  // zodat bij terugkomst de positie behouden blijft.
+  // Cleanup
   useEffect(() => {
     return () => {
       if (post.mediaType === "photo" && post.audio && audioRef.current) {
@@ -348,197 +346,287 @@ const PostComponent: React.FC<PostProps> = ({
     };
   }, []);
 
-   // Log de hoogte van de post zodra deze is gerenderd
-   const handleLayout = (event: any) => {
+  // Log de hoogte van de post zodra deze is gerenderd
+  const handleLayout = (event: any) => {
     const { height } = event.nativeEvent.layout;
     console.log("Post height:", height);
   };
 
   return (
-    <View style={styles.postContainer} onLayout={handleLayout}>
-      <Pressable onPress={handlePlayPause} style={styles.mediaContainer}>
-  
-        {/* 1) Media eerste */}
-        {post.mediaType === "video" ? (
-          <Video
-            ref={videoRef}
-            source={{ uri: post.mediaUrl as string }}
-            style={styles.media}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay={false}
-            isLooping
-            useNativeControls={false}
-          />
-        ) : (
-          <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
-        )}
-  
-        {/* 2) Blur achtergrond onder header */}
-        <BlurView intensity={5} tint="dark" style={styles.blurBackground} />
-  
-        {/* 3) Header‐content bovenop de blur */}
-        <View style={styles.postHeaderOverlay}>
-          <View style={styles.profileContainer}>
-            <ProfileLink userId={post.userId}>
-              <Image
-                source={{ uri: post.profileImage }}
-                style={{ width: scale * 25, height: scale * 25, borderRadius: scale * 15 }}
-              />
-            </ProfileLink>
-            <ProfileLink userId={post.userId}>
-              <View style={styles.userInfo}>
-                <Text style={styles.usernameText}>{post.username}</Text>
-                <Text style={styles.displayNameText}>
-                  {post.display_name} <Text style={styles.dot}>•</Text> {post.role}
-                </Text>
-              </View>
-            </ProfileLink>
-          </View>
-          <View style={styles.headerTags}>
-            <TouchableOpacity onPress={expandArtistTags}>
-              <View style={styles.artistTagsContainerHeader}>
-                {post.artistTags?.map((tagId, index) => {
-                  const foundTag = artistTags.find((t) => t.id === tagId);
-                  if (!foundTag) return null;
-                  const animatedMargin = index === 0
-                    ? 0
-                    : toggleAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-10, 0],
-                      });
-                  return (
-                    <Animated.View key={foundTag.id} style={{ marginLeft: animatedMargin }}>
-                      <ArtistTag
-                        id={foundTag.id}
-                        name={foundTag.name}
-                        image={foundTag.image}
-                        disableModuleOpen={!artistExpanded}
-                      />
-                    </Animated.View>
-                  );
-                })}
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={collapseArtistTags}>
-              <View style={styles.genreTagsContainerHeader}>
-                {post.genreTags?.map((tagId, index) => {
-                  const foundTag = genreTags.find((t) => t.id === tagId);
-                  if (!foundTag) return null;
-                  const animatedMargin = index === 0
-                    ? 0
-                    : toggleAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [2, -20],
-                      });
-                  return (
-                    <Animated.View key={foundTag.id} style={{ marginLeft: animatedMargin }}>
-                      <GenreTag id={foundTag.id} name={foundTag.name} />
-                    </Animated.View>
-                  );
-                })}
-              </View>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.headerDivider} />
-        </View>
-  
-        {/* 4) Controls */}
-        <View style={styles.controlsContainer}>
-          <View style={styles.playButtonContainer}>
-            <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
-          </View>
-          <View style={styles.seekbarContainer}>
-            <Slider
-              style={{ width: scale * 200, height: scale * 20 }}
-              minimumValue={0}
-              maximumValue={1}
-              value={duration ? currentTime / duration : 0}
-              minimumTrackTintColor="#FFFFFF"
-              maximumTrackTintColor="#000000"
-              thumbTintColor="#FFFFFF00"
-              onSlidingComplete={handleSlidingComplete}
+    <View style={styles.fullScreen}>
+      {/* fullscreen background (media + blur) */}
+      {post.mediaType === "video" ? (
+        <Video
+          source={{ uri: post.mediaUrl as string }}
+          style={StyleSheet.absoluteFill}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay={false}
+          isLooping={false}
+        />
+      ) : (
+        <Image
+          source={{ uri: post.mediaUrl as string }}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+      <BlurView 
+      intensity={30} 
+      tint="dark" 
+      style={{ position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: scale * 158,      // <-- hier stop de blur
+        borderTopLeftRadius: scale * 20,
+        borderTopRightRadius: scale * 20,
+        zIndex: 0,
+      }}
+      />
+
+      {/* ───── fade van blur naar zwart ───── */}
+   <LinearGradient
+     colors={["transparent", "#121212"]}
+     locations={[0.5, 0.8]}   
+     style={StyleSheet.absoluteFill}
+   />
+    
+       <View style={styles.blackBottom} />
+      
+
+      {/* jouw bestaande post-container */}
+      <View style={styles.postContainer} onLayout={handleLayout}>
+        <Pressable onPress={handlePlayPause} style={styles.mediaContainer}>
+          {/* media */}
+          {post.mediaType === "video" ? (
+            <Video
+              ref={videoRef}
+              source={{ uri: post.mediaUrl as string }}
+              style={styles.media}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay={false}
+              isLooping
+              useNativeControls={false}
             />
+          ) : (
+            <Image
+              source={{ uri: post.mediaUrl as string }}
+              style={styles.media}
+            />
+          )}
+
+          {/* header overlay */}
+          <View style={styles.postHeaderOverlay}>
+            <View style={styles.profileContainer}>
+              <ProfileLink userId={post.userId}>
+                <Image
+                  source={{ uri: post.profileImage }}
+                  style={{
+                    width: scale * 25,
+                    height: scale * 25,
+                    borderRadius: scale * 15,
+                  }}
+                />
+              </ProfileLink>
+              <ProfileLink userId={post.userId}>
+                <View style={styles.userInfo}>
+                  <Text style={styles.usernameText}>{post.username}</Text>
+                  <Text style={styles.displayNameText}>
+                    {post.display_name} <Text style={styles.dot}>•</Text>{" "}
+                    {post.role}
+                  </Text>
+                </View>
+              </ProfileLink>
+            </View>
+            <View style={styles.headerTags}>
+              <TouchableOpacity onPress={expandArtistTags}>
+                <View style={styles.artistTagsContainerHeader}>
+                  {post.artistTags?.map((tagId, index) => {
+                    const foundTag = artistTags.find((t) => t.id === tagId);
+                    if (!foundTag) return null;
+                    const animatedMargin =
+                      index === 0
+                        ? 0
+                        : toggleAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-10, 0],
+                          });
+                    return (
+                      <Animated.View
+                        key={foundTag.id}
+                        style={{ marginLeft: animatedMargin }}
+                      >
+                        <ArtistTag
+                          id={foundTag.id}
+                          name={foundTag.name}
+                          image={foundTag.image}
+                          disableModuleOpen={!artistExpanded}
+                        />
+                      </Animated.View>
+                    );
+                  })}
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={collapseArtistTags}>
+                <View style={styles.genreTagsContainerHeader}>
+                  {post.genreTags?.map((tagId, index) => {
+                    const foundTag = genreTags.find((t) => t.id === tagId);
+                    if (!foundTag) return null;
+                    const animatedMargin =
+                      index === 0
+                        ? 0
+                        : toggleAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [2, -20],
+                          });
+                    return (
+                      <Animated.View
+                        key={foundTag.id}
+                        style={{ marginLeft: animatedMargin }}
+                      >
+                        <GenreTag id={foundTag.id} name={foundTag.name} />
+                      </Animated.View>
+                    );
+                  })}
+                </View>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.headerDivider} />
           </View>
-          <ReplayButton onPress={handleReplay} />
+
+          {/* controls */}
+          <View style={styles.controlsContainer}>
+            <View style={styles.playButtonContainer}>
+              <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
+            </View>
+            <View style={styles.seekbarContainer}>
+              <Slider
+                style={{ width: scale * 200, height: scale * 20 }}
+                minimumValue={0}
+                maximumValue={1}
+                value={duration ? currentTime / duration : 0}
+                minimumTrackTintColor="#FFFFFF"
+                maximumTrackTintColor="#000000"
+                thumbTintColor="#FFFFFF00"
+                onSlidingComplete={handleSlidingComplete}
+              />
+            </View>
+            <ReplayButton onPress={handleReplay} />
+          </View>
+
+          {/* info overlay */}
+          <View style={styles.infoOverlay}>
+            <Text style={styles.postTitle}>{post.title}</Text>
+            <Text
+              style={[
+                styles.postDescription,
+                { marginBottom: descriptionExpanded ? 10 : 0 },
+              ]}
+              numberOfLines={descriptionExpanded ? undefined : 2}
+            >
+              {post.description}
+            </Text>
+            <Text
+              style={[styles.postDescription, styles.hiddenText]}
+              onTextLayout={(e) => {
+                if (e.nativeEvent.lines.length > 2 && !showSeeMore)
+                  setShowSeeMore(true);
+              }}
+            >
+              {post.description}
+            </Text>
+            {showSeeMore && (
+              <TouchableOpacity onPress={toggleDescription}>
+                <Text style={styles.seeMoreText}>
+                  {descriptionExpanded ? "See less" : "See more"}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* action buttons */}
+          {currentUserId && (
+            <>
+              <TouchableOpacity
+                style={[styles.iconButton, styles.likeButton]}
+                onPress={() => {}}
+              >
+                <Like
+                  postId={post.id}
+                  userId={currentUserId}
+                  receiverId={post.userId}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.iconButton, styles.saveButton]}
+                onPress={() => {}}
+              >
+                <SaveButton postId={post.id} userId={currentUserId} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.iconButton, styles.followButton]}
+                onPress={() => {}}
+              >
+                <Follow
+                  followerId={currentUserId}
+                  followingId={post.userId}
+                />
+              </TouchableOpacity>
+            </>
+          )}
+        </Pressable>
+
+        {/* timestamp */}
+        <View style={styles.timestampContainer}>
+          <Timestamp timestamp={post.timestamp} />
         </View>
-  
-        {/* 5) Info overlay */}
-        <View style={styles.infoOverlay}>
-          <Text style={styles.postTitle}>{post.title}</Text>
-          <Text
-            style={[styles.postDescription, { marginBottom: descriptionExpanded ? 10 : 0 }]}
-            numberOfLines={descriptionExpanded ? undefined : 2}
-          >
-            {post.description}
-          </Text>
-          <Text
-            style={[styles.postDescription, styles.hiddenText]}
-            onTextLayout={(e) => {
-              if (e.nativeEvent.lines.length > 2 && !showSeeMore) setShowSeeMore(true);
-            }}
-          >
-            {post.description}
-          </Text>
-          {showSeeMore && (
-            <TouchableOpacity onPress={toggleDescription}>
-              <Text style={styles.seeMoreText}>
-                {descriptionExpanded ? "See less" : "See more"}
-              </Text>
+
+        {/* collab button */}
+        <View style={styles.collabContainer}>
+          {currentUserId ? (
+            <Collab
+              senderId={currentUserId}
+              receiverId={post.userId}
+              postId={post.id}
+            />
+          ) : (
+            <TouchableOpacity style={styles.collabDisabled} disabled>
+              <Text style={styles.collabText}>LOGIN TO COLLAB!</Text>
             </TouchableOpacity>
           )}
         </View>
-  
-        {/* 6) Actieknoppen */}
-        {currentUserId && (
-          <>
-            <TouchableOpacity style={[styles.iconButton, styles.likeButton]} onPress={() => {}}>
-              <Like postId={post.id} userId={currentUserId} receiverId={post.userId} />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.iconButton, styles.saveButton]} onPress={() => {}}>
-              <SaveButton postId={post.id} userId={currentUserId} />
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.iconButton, styles.followButton]} onPress={() => {}}>
-              <Follow followerId={currentUserId} followingId={post.userId} />
-            </TouchableOpacity>
-          </>
-        )}
-      </Pressable>
-  
-      {/* 7) Timestamp */}
-      <View style={styles.timestampContainer}>
-        <Timestamp timestamp={post.timestamp} />
-      </View>
-  
-      {/* 8) Collab-knop onderaan */}
-      <View style={styles.collabContainer}>
-        {currentUserId ? (
-          <Collab senderId={currentUserId} receiverId={post.userId} postId={post.id} />
-        ) : (
-          <TouchableOpacity style={styles.collabDisabled} disabled>
-            <Text style={styles.collabText}>LOGIN TO COLLAB!</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </View>
   );
-  
-  
-  
-  
-  
 };
 
 const styles = StyleSheet.create({
+  fullScreen: {
+    position: "relative",
+    width: windowWidth,
+    height: windowHeight,
+    backgroundColor: "#000",
+  },
+  blackBottom: {
+  position: "absolute",
+  top: scale * 800,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "#121212",
+  zIndex: 0,  // onder je postContainer (die zIndex 2 heeft)
+  },
+
   postContainer: {
-    backgroundColor: "#121212",
+    backgroundColor: "transparant",
     borderRadius: scale * 15,
     padding: scale * 10,
     marginBottom: scale * 20,
-    height: scale * 620, // vaste hoogte zodat deze matcht met itemLength in de feed
+    height: scale * 620,
     width: scale * 365,
     alignSelf: "center",
-    transform: [{ translateY: -25 }], // Dit verplaatst de hele post 20 pixels omhoog.
- 
+    transform: [{ translateY: +110 }],
+    
+
   },
   postHeaderOverlay: {
     position: "absolute",
@@ -551,31 +639,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: scale * 10,
     backgroundColor: "transparent",
     zIndex: 1,
-
- },
- blurBackground: {
-  position: 'absolute',
-  top: 0, left: 0, right: 0,
-  height: scale * 42,
-  borderTopLeftRadius: scale * 10,
-  borderTopRightRadius: scale * 10,
-  borderBottomLeftRadius: scale * 10,
-  borderBottomRightRadius: scale * 10,
-  overflow: 'hidden',
-  zIndex: 0,
-},
-
+  },
+  blurBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: scale * 42,
+    borderTopLeftRadius: scale * 10,
+    borderTopRightRadius: scale * 10,
+    borderBottomLeftRadius: scale * 10,
+    borderBottomRightRadius: scale * 10,
+    overflow: "hidden",
+    zIndex: 0,
+  },
   headerDivider: {
     position: "absolute",
-    bottom: -6,                      // iets naar beneden verplaatst
-    left: scale * 10,               // marge aan beide kanten
+    bottom: -6,
+    left: scale * 10,
     right: scale * 10,
-    height: StyleSheet.hairlineWidth * 2,  // iets dikker dan hairline
-    backgroundColor: "rgba(255,255,255,0.6)",// wit, 60% opacity,
-
-    
+    height: StyleSheet.hairlineWidth * 2,
+    backgroundColor: "rgba(255,255,255,0.6)",
   },
- 
   profileContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -587,14 +672,10 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: scale * 12,
     fontWeight: "bold",
-    
-
   },
   displayNameText: {
     color: "white",
     fontSize: scale * 10,
-
-
   },
   dot: {
     marginHorizontal: scale * 3,
@@ -606,7 +687,6 @@ const styles = StyleSheet.create({
   artistTagsContainerHeader: {
     flexDirection: "row",
     alignItems: "center",
-    
   },
   genreTagsContainerHeader: {
     flexDirection: "row",
@@ -615,16 +695,21 @@ const styles = StyleSheet.create({
   },
   mediaContainer: {
     width: scale * 340,
-    borderRadius: scale * 20,
+    borderRadius: scale * 10,
     overflow: "hidden",
     backgroundColor: "#000",
     marginBottom: scale * 10,
     height: scale * 530,
     alignSelf: "center",
+    position: "relative",
+   
+    
   },
   media: {
     width: "100%",
     height: "100%",
+    position: "relative",
+    zIndex: 0,
   },
   controlsContainer: {
     position: "absolute",
@@ -664,14 +749,14 @@ const styles = StyleSheet.create({
     fontSize: scale * 16,
     fontWeight: "bold",
     marginBottom: scale * 5,
-    textShadowColor: "#000", // Zwarte schaduw
+    textShadowColor: "#000",
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 1,
   },
   postDescription: {
     color: "white",
     fontSize: scale * 14,
-    textShadowColor: "#000", // Zwarte schaduw
+    textShadowColor: "#000",
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 1,
   },
@@ -690,7 +775,7 @@ const styles = StyleSheet.create({
     marginVertical: scale * 5,
     alignItems: "center",
     bottom: scale * 8,
-   opacity: 0
+    opacity: 0,
   },
   actionButtonsOverlay: {
     position: "absolute",
@@ -701,49 +786,41 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 2,
   },
-
   iconButton: {
-      marginVertical: scale * 50,
-      position: 'absolute',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 10,
+    marginVertical: scale * 50,
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
   },
-      
   likeButton: {
-        top: scale * 170,   // pas deze waarden aan om perfect te plaatsen
-        right: scale * 10,
+    top: scale * 170,
+    right: scale * 10,
   },
-      saveButton: {
-        top: scale * 220,
-        right: scale * 10,
+  saveButton: {
+    top: scale * 220,
+    right: scale * 10,
   },
-      followButton: {
-        top: scale * 265,
-        right: scale * 5,
+  followButton: {
+    top: scale * 265,
+    right: scale * 5,
   },
-
   collabContainer: {
     alignItems: "center",
     marginBottom: scale * 10,
   },
-
   collabDisabled: {
     opacity: 0.5,
   },
-
   collabText: {
     color: "#fff",
   },
-  
   buttonWrapper: {
     margin: scale * 3,
   },
   postActions: {
     left: scale * 18,
   },
-
-
 });
 
 export default PostComponent;

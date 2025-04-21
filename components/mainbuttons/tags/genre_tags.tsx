@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
       text: {
         fontSize: 12,
         color: "white",
-        fontWeight: "bold",
+
         textAlign: "center",
         textAlignVertical: "center", // Voeg dit toe
         lineHeight: 20, // lineHeight gelijk aan de containerhoogte

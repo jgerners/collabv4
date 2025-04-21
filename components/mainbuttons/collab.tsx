@@ -141,12 +141,14 @@ const styles = StyleSheet.create({
     
   },
   collabButton: {
-    padding: 5,
-    borderRadius: 12,
+    paddingVertical: 3,
+    borderRadius: 15,
     height: 30,
     width: 120,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#7602b5"
     
    
     
