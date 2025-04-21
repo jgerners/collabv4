@@ -18,6 +18,9 @@ import { Audio } from "expo-av";
 // Importeer de cache helper
 import { setCachedAudio } from "../../helpers/audioCache";
 
+import { useLayoutEffect } from 'react';
+import { useNavigation } from '@react-navigation/native';
+
 const { width: windowWidth } = Dimensions.get("window");
 const scale = windowWidth / 370;
 // Zorg ervoor dat itemLength de volledige hoogte van een post vertegenwoordigt
@@ -240,7 +243,7 @@ const FeedScreenContent: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "black" },
+  container: { flex: 1, backgroundColor: "#121212" },
   loadingContainer: {
     justifyContent: "center",
     alignItems: "center",
@@ -258,6 +261,17 @@ const styles = StyleSheet.create({
 });
 
 const FeedScreen: React.FC = () => {
+  const navigation = useNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTransparent: true,
+      headerTitle: 'Feed',
+      headerShadowVisible: false,
+      headerTintColor: '#fff',
+    });
+  }, [navigation]);
+
   return (
     <ActivePostProvider>
       <FeedScreenContent />

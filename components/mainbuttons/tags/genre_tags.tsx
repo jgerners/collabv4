@@ -21,21 +21,24 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center", // Centreert de inhoud verticaal
-        marginRight: 3,
-        backgroundColor: "#121212",
-        paddingHorizontal: 5,
-        paddingVertical: 2,
-        borderRadius: 10,
+        marginRight: 2,
+        backgroundColor: "transparant",
+        paddingHorizontal: 2,
+        paddingVertical: 0,
+        borderRadius: 7,
         marginVertical: 4,
-        borderWidth: 1,               // Dunne rand
+        borderWidth: 0.5,               // Dunne rand
         borderColor: "white",         // Witte rand
       },
       text: {
         fontSize: 12,
         color: "white",
+        fontWeight: "bold",
         textAlign: "center",
         textAlignVertical: "center", // Voeg dit toe
         lineHeight: 20, // lineHeight gelijk aan de containerhoogte
+       
+    
 
       },
 });

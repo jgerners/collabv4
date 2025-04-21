@@ -18,6 +18,8 @@ import { useAuth } from "../context/authContext";
 import Slider from "@react-native-community/slider";
 import { setCurrentPlayingMedia, stopCurrentMedia } from "../PlaybackManager";
 
+import { BlurView } from 'expo-blur';
+
 // Importeer de audio cache helper
 import { getCachedAudio, setCachedAudio } from "../helpers/audioCache";
 
@@ -354,67 +356,9 @@ const PostComponent: React.FC<PostProps> = ({
 
   return (
     <View style={styles.postContainer} onLayout={handleLayout}>
-      <View style={styles.postHeader}>
-        <View style={styles.profileContainer}>
-          <ProfileLink userId={post.userId}>
-            <Image
-              source={{ uri: post.profileImage }}
-              style={{ width: scale * 25, height: scale * 25, borderRadius: scale * 15 }}
-            />
-          </ProfileLink>
-          <ProfileLink userId={post.userId}>
-            <View style={styles.userInfo}>
-              <Text style={styles.usernameText}>{post.username}</Text>
-              <Text style={styles.displayNameText}>
-                {post.display_name} <Text style={styles.dot}>•</Text> {post.role}
-              </Text>
-            </View>
-          </ProfileLink>
-        </View>
-        <View style={styles.headerTags}>
-          <TouchableOpacity onPress={expandArtistTags}>
-            <View style={styles.artistTagsContainerHeader}>
-              {post.artistTags?.map((tagId, index) => {
-                const foundTag = artistTags.find((tag) => tag.id === tagId);
-                if (!foundTag) return null;
-                const animatedMargin = index === 0 ? 0 : toggleAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-10, 5],
-                });
-                return (
-                  <Animated.View key={foundTag.id} style={{ marginLeft: animatedMargin }}>
-                    <ArtistTag
-                      id={foundTag.id}
-                      name={foundTag.name}
-                      image={foundTag.image}
-                      disableModuleOpen={!artistExpanded}
-                    />
-                  </Animated.View>
-                );
-              })}
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={collapseArtistTags}>
-            <View style={styles.genreTagsContainerHeader}>
-              {post.genreTags?.map((tagId, index) => {
-                const foundTag = genreTags.find((tag) => tag.id === tagId);
-                if (!foundTag) return null;
-                const animatedMargin = index === 0 ? 0 : toggleAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [2, -20],
-                });
-                return (
-                  <Animated.View key={foundTag.id} style={{ marginLeft: animatedMargin }}>
-                    <GenreTag id={foundTag.id} name={foundTag.name} />
-                  </Animated.View>
-                );
-              })}
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       <Pressable onPress={handlePlayPause} style={styles.mediaContainer}>
+  
+        {/* 1) Media eerste */}
         {post.mediaType === "video" ? (
           <Video
             ref={videoRef}
@@ -428,7 +372,77 @@ const PostComponent: React.FC<PostProps> = ({
         ) : (
           <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
         )}
-
+  
+        {/* 2) Blur achtergrond onder header */}
+        <BlurView intensity={5} tint="dark" style={styles.blurBackground} />
+  
+        {/* 3) Header‐content bovenop de blur */}
+        <View style={styles.postHeaderOverlay}>
+          <View style={styles.profileContainer}>
+            <ProfileLink userId={post.userId}>
+              <Image
+                source={{ uri: post.profileImage }}
+                style={{ width: scale * 25, height: scale * 25, borderRadius: scale * 15 }}
+              />
+            </ProfileLink>
+            <ProfileLink userId={post.userId}>
+              <View style={styles.userInfo}>
+                <Text style={styles.usernameText}>{post.username}</Text>
+                <Text style={styles.displayNameText}>
+                  {post.display_name} <Text style={styles.dot}>•</Text> {post.role}
+                </Text>
+              </View>
+            </ProfileLink>
+          </View>
+          <View style={styles.headerTags}>
+            <TouchableOpacity onPress={expandArtistTags}>
+              <View style={styles.artistTagsContainerHeader}>
+                {post.artistTags?.map((tagId, index) => {
+                  const foundTag = artistTags.find((t) => t.id === tagId);
+                  if (!foundTag) return null;
+                  const animatedMargin = index === 0
+                    ? 0
+                    : toggleAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-10, 0],
+                      });
+                  return (
+                    <Animated.View key={foundTag.id} style={{ marginLeft: animatedMargin }}>
+                      <ArtistTag
+                        id={foundTag.id}
+                        name={foundTag.name}
+                        image={foundTag.image}
+                        disableModuleOpen={!artistExpanded}
+                      />
+                    </Animated.View>
+                  );
+                })}
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={collapseArtistTags}>
+              <View style={styles.genreTagsContainerHeader}>
+                {post.genreTags?.map((tagId, index) => {
+                  const foundTag = genreTags.find((t) => t.id === tagId);
+                  if (!foundTag) return null;
+                  const animatedMargin = index === 0
+                    ? 0
+                    : toggleAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [2, -20],
+                      });
+                  return (
+                    <Animated.View key={foundTag.id} style={{ marginLeft: animatedMargin }}>
+                      <GenreTag id={foundTag.id} name={foundTag.name} />
+                    </Animated.View>
+                  );
+                })}
+              </View>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.headerDivider} />
+        </View>
+  
+        {/* 4) Controls */}
         <View style={styles.controlsContainer}>
           <View style={styles.playButtonContainer}>
             <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
@@ -447,7 +461,8 @@ const PostComponent: React.FC<PostProps> = ({
           </View>
           <ReplayButton onPress={handleReplay} />
         </View>
-
+  
+        {/* 5) Info overlay */}
         <View style={styles.infoOverlay}>
           <Text style={styles.postTitle}>{post.title}</Text>
           <Text
@@ -459,9 +474,7 @@ const PostComponent: React.FC<PostProps> = ({
           <Text
             style={[styles.postDescription, styles.hiddenText]}
             onTextLayout={(e) => {
-              if (e.nativeEvent.lines.length > 2 && !showSeeMore) {
-                setShowSeeMore(true);
-              }
+              if (e.nativeEvent.lines.length > 2 && !showSeeMore) setShowSeeMore(true);
             }}
           >
             {post.description}
@@ -474,43 +487,45 @@ const PostComponent: React.FC<PostProps> = ({
             </TouchableOpacity>
           )}
         </View>
+  
+        {/* 6) Actieknoppen */}
+        {currentUserId && (
+          <>
+            <TouchableOpacity style={[styles.iconButton, styles.likeButton]} onPress={() => {}}>
+              <Like postId={post.id} userId={currentUserId} receiverId={post.userId} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.iconButton, styles.saveButton]} onPress={() => {}}>
+              <SaveButton postId={post.id} userId={currentUserId} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.iconButton, styles.followButton]} onPress={() => {}}>
+              <Follow followerId={currentUserId} followingId={post.userId} />
+            </TouchableOpacity>
+          </>
+        )}
       </Pressable>
-
-      {/* Timestamp net onder de media en boven de actieknoppen */}
+  
+      {/* 7) Timestamp */}
       <View style={styles.timestampContainer}>
         <Timestamp timestamp={post.timestamp} />
       </View>
-
-      <View style={styles.bottomContainer}>
-        <View style={styles.leftButtons}>
-          {currentUserId && (
-            <View style={styles.buttonWrapper}>
-              <Like postId={post.id} userId={currentUserId} receiverId={post.userId} />
-            </View>
-          )}
-          {currentUserId && (
-            <View style={styles.buttonWrapper}>
-              <SaveButton postId={post.id} userId={currentUserId} />
-            </View>
-          )}
-          {currentUserId && (
-            <View style={styles.buttonWrapper}>
-              <Follow followerId={currentUserId} followingId={post.userId} />
-            </View>
-          )}
-        </View>
-        <View style={styles.rightButtons}>
-          {currentUserId ? (
-            <Collab senderId={currentUserId} receiverId={post.userId} postId={post.id} />
-          ) : (
-            <TouchableOpacity style={styles.collabButtonDisabled} disabled={true}>
-              <Text style={styles.collabText}>LOGIN TO COLLAB!</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+  
+      {/* 8) Collab-knop onderaan */}
+      <View style={styles.collabContainer}>
+        {currentUserId ? (
+          <Collab senderId={currentUserId} receiverId={post.userId} postId={post.id} />
+        ) : (
+          <TouchableOpacity style={styles.collabDisabled} disabled>
+            <Text style={styles.collabText}>LOGIN TO COLLAB!</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
+  
+  
+  
+  
+  
 };
 
 const styles = StyleSheet.create({
@@ -525,12 +540,42 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -25 }], // Dit verplaatst de hele post 20 pixels omhoog.
  
   },
-  postHeader: {
+  postHeaderOverlay: {
+    position: "absolute",
+    marginTop: 5,
+    width: "100%",
+    height: scale * 32,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: scale * 10,
+    paddingHorizontal: scale * 10,
+    backgroundColor: "transparent",
+    zIndex: 1,
+
+ },
+ blurBackground: {
+  position: 'absolute',
+  top: 0, left: 0, right: 0,
+  height: scale * 42,
+  borderTopLeftRadius: scale * 10,
+  borderTopRightRadius: scale * 10,
+  borderBottomLeftRadius: scale * 10,
+  borderBottomRightRadius: scale * 10,
+  overflow: 'hidden',
+  zIndex: 0,
+},
+
+  headerDivider: {
+    position: "absolute",
+    bottom: -6,                      // iets naar beneden verplaatst
+    left: scale * 10,               // marge aan beide kanten
+    right: scale * 10,
+    height: StyleSheet.hairlineWidth * 2,  // iets dikker dan hairline
+    backgroundColor: "rgba(255,255,255,0.6)",// wit, 60% opacity,
+
+    
   },
+ 
   profileContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -542,10 +587,14 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: scale * 12,
     fontWeight: "bold",
+    
+
   },
   displayNameText: {
     color: "white",
     fontSize: scale * 10,
+
+
   },
   dot: {
     marginHorizontal: scale * 3,
@@ -557,6 +606,7 @@ const styles = StyleSheet.create({
   artistTagsContainerHeader: {
     flexDirection: "row",
     alignItems: "center",
+    
   },
   genreTagsContainerHeader: {
     flexDirection: "row",
@@ -564,12 +614,12 @@ const styles = StyleSheet.create({
     marginLeft: scale * 5,
   },
   mediaContainer: {
-    width: scale * 345,
-    borderRadius: scale * 10,
+    width: scale * 340,
+    borderRadius: scale * 20,
     overflow: "hidden",
     backgroundColor: "#000",
     marginBottom: scale * 10,
-    height: scale * 490,
+    height: scale * 530,
     alignSelf: "center",
   },
   media: {
@@ -640,38 +690,60 @@ const styles = StyleSheet.create({
     marginVertical: scale * 5,
     alignItems: "center",
     bottom: scale * 8,
+   opacity: 0
   },
-  bottomContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  actionButtonsOverlay: {
+    position: "absolute",
+    right: scale * 10,
+    top: "50%",
+    transform: [{ translateY: -((scale * 30 * 3 + scale * 8 * 2) / 2) }],
+    flexDirection: "column",
     alignItems: "center",
-    marginTop: scale * 5,
-    paddingHorizontal: scale * 10,
+    zIndex: 2,
   },
-  bottomButtons: {
-    flexDirection: "row",
+
+  iconButton: {
+      marginVertical: scale * 50,
+      position: 'absolute',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10,
+  },
+      
+  likeButton: {
+        top: scale * 170,   // pas deze waarden aan om perfect te plaatsen
+        right: scale * 10,
+  },
+      saveButton: {
+        top: scale * 220,
+        right: scale * 10,
+  },
+      followButton: {
+        top: scale * 265,
+        right: scale * 5,
+  },
+
+  collabContainer: {
     alignItems: "center",
-    right: scale * 12,
+    marginBottom: scale * 10,
   },
-  leftButtons: {
-    flexDirection: "row",
-    alignItems: "center",
-    right: scale * 15,
-    
+
+  collabDisabled: {
+    opacity: 0.5,
   },
-  rightButtons: {
-    flexDirection: "row",
-    alignItems: "center",
-    left: scale * 10,
+
+  collabText: {
+    color: "#fff",
   },
+  
   buttonWrapper: {
     margin: scale * 3,
   },
   postActions: {
     left: scale * 18,
   },
-  collabButtonDisabled: {},
-  collabText: {},
+
+
 });
 
 export default PostComponent;

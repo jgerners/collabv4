@@ -10,6 +10,8 @@ import { RootStackParamList } from '../routes';
 import { AuthProvider, useAuth } from '../context/authContext'; // ✅ Import AuthContext
 import  EditProfile  from "./screens/editprofile";
 
+import { StatusBar } from 'expo-status-bar';
+
 // 📌 Screens Importeren
 import FeedScreen from './(tabs)/feedtest';
 import ProfileScreen from './(tabs)/profile';
@@ -39,9 +41,7 @@ function TabsLayout() {
         headerShown: true,
         headerTransparent: true,
         headerStyle: { height: 110, },
-        headerBackground: () => (
-          <BlurView intensity={50} tint="dark" style={styles.headerBackground} />
-        ),
+        
         headerTitleAlign: 'center',
         headerTitleStyle: {
           fontSize: 25,
@@ -63,6 +63,7 @@ function TabsLayout() {
         component={FeedScreen}
         options={{
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          
         }}
       />
       <Tab.Screen
@@ -174,6 +175,7 @@ function AuthNavigator() {
 export default function AppNavigator() {
   return (
     <AuthProvider>
+       <StatusBar style="light" backgroundColor="transparent" translucent />
       <AuthNavigator />
     </AuthProvider>
   );
