@@ -28,6 +28,7 @@ import { getCachedAudio, setCachedAudio } from "../helpers/audioCache";
 import ProfileLink from "./profileLink";
 import Like from "./mainbuttons/like";
 import Follow from "./mainbuttons/follow";
+import MoreOptions from "./mainbuttons/moreOptions";
 import PlayPause from "./mainbuttons/play_pause";
 import Collab from "./mainbuttons/collab";
 import ArtistTag from "./mainbuttons/tags/artist_tags";
@@ -88,6 +89,14 @@ interface PostProps {
   feedFocused: boolean; // Geeft aan of de feed in focus is
   withinPreloadRange: boolean; // Indicator, maar niet meer actief gebruikt
 }
+
+// voor de timers bij de seekbar
+const formatTime = (ms: number) => {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+};
 
 const PostComponent: React.FC<PostProps> = ({
   post,
@@ -354,45 +363,52 @@ const PostComponent: React.FC<PostProps> = ({
 
   return (
     <View style={styles.fullScreen}>
-      {/* fullscreen background (media + blur) */}
-      {post.mediaType === "video" ? (
-        <Video
-          source={{ uri: post.mediaUrl as string }}
-          style={StyleSheet.absoluteFill}
-          resizeMode={ResizeMode.COVER}
-          shouldPlay={false}
-          isLooping={false}
+      {/* verschuif de volledige media + blur 50 punten naar beneden */}
+      <View
+        style={{
+          position: "absolute",
+          top: scale * 100,
+          left: 0,
+          right: 0,
+          bottom: 0,
+        }}
+      >
+        {post.mediaType === "video" ? (
+          <Video
+            source={{ uri: post.mediaUrl as string }}
+            style={StyleSheet.absoluteFill}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay={false}
+            isLooping={false}
+          />
+        ) : (
+          <Image
+            source={{ uri: post.mediaUrl as string }}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+        <BlurView
+          intensity={45}
+          tint="dark"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              borderTopLeftRadius: scale * 20,
+              borderTopRightRadius: scale * 20,
+            },
+          ]}
         />
-      ) : (
-        <Image
-          source={{ uri: post.mediaUrl as string }}
-          style={StyleSheet.absoluteFill}
-        />
-      )}
-      <BlurView 
-      intensity={30} 
-      tint="dark" 
-      style={{ position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: scale * 158,      // <-- hier stop de blur
-        borderTopLeftRadius: scale * 20,
-        borderTopRightRadius: scale * 20,
-        zIndex: 0,
-      }}
-      />
-
+      </View>
+  
       {/* ───── fade van blur naar zwart ───── */}
-   <LinearGradient
-     colors={["transparent", "#121212"]}
-     locations={[0.5, 0.8]}   
-     style={StyleSheet.absoluteFill}
-   />
-    
-       <View style={styles.blackBottom} />
-      
-
+      <LinearGradient
+        colors={["transparent", "black"]}
+        locations={[0.5, 0.9]}
+        style={StyleSheet.absoluteFill}
+      />
+  
+      <View style={styles.blackBottom} />
+  
       {/* jouw bestaande post-container */}
       <View style={styles.postContainer} onLayout={handleLayout}>
         <Pressable onPress={handlePlayPause} style={styles.mediaContainer}>
@@ -413,106 +429,38 @@ const PostComponent: React.FC<PostProps> = ({
               style={styles.media}
             />
           )}
+  
+     {/* controls */}
+<View style={styles.controlsContainer}>
+  {/* huidige tijd */}
+  <View style={styles.timeLabelCurrent}>
+    <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+  </View>
 
-          {/* header overlay */}
-          <View style={styles.postHeaderOverlay}>
-            <View style={styles.profileContainer}>
-              <ProfileLink userId={post.userId}>
-                <Image
-                  source={{ uri: post.profileImage }}
-                  style={{
-                    width: scale * 25,
-                    height: scale * 25,
-                    borderRadius: scale * 15,
-                  }}
-                />
-              </ProfileLink>
-              <ProfileLink userId={post.userId}>
-                <View style={styles.userInfo}>
-                  <Text style={styles.usernameText}>{post.username}</Text>
-                  <Text style={styles.displayNameText}>
-                    {post.display_name} <Text style={styles.dot}>•</Text>{" "}
-                    {post.role}
-                  </Text>
-                </View>
-              </ProfileLink>
-            </View>
-            <View style={styles.headerTags}>
-              <TouchableOpacity onPress={expandArtistTags}>
-                <View style={styles.artistTagsContainerHeader}>
-                  {post.artistTags?.map((tagId, index) => {
-                    const foundTag = artistTags.find((t) => t.id === tagId);
-                    if (!foundTag) return null;
-                    const animatedMargin =
-                      index === 0
-                        ? 0
-                        : toggleAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [-10, 0],
-                          });
-                    return (
-                      <Animated.View
-                        key={foundTag.id}
-                        style={{ marginLeft: animatedMargin }}
-                      >
-                        <ArtistTag
-                          id={foundTag.id}
-                          name={foundTag.name}
-                          image={foundTag.image}
-                          disableModuleOpen={!artistExpanded}
-                        />
-                      </Animated.View>
-                    );
-                  })}
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={collapseArtistTags}>
-                <View style={styles.genreTagsContainerHeader}>
-                  {post.genreTags?.map((tagId, index) => {
-                    const foundTag = genreTags.find((t) => t.id === tagId);
-                    if (!foundTag) return null;
-                    const animatedMargin =
-                      index === 0
-                        ? 0
-                        : toggleAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [2, -20],
-                          });
-                    return (
-                      <Animated.View
-                        key={foundTag.id}
-                        style={{ marginLeft: animatedMargin }}
-                      >
-                        <GenreTag id={foundTag.id} name={foundTag.name} />
-                      </Animated.View>
-                    );
-                  })}
-                </View>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.headerDivider} />
-          </View>
+  {/* slider zelf */}
+  <View style={styles.seekbarContainer}>
+    <Slider
+      style={{ width: scale * 250, transform: [{ scaleY: 1.5 }] }}
+      minimumValue={0}
+      maximumValue={1}
+      value={duration ? currentTime / duration : 0}
+      minimumTrackTintColor="#FFFFFF"
+      maximumTrackTintColor="#000000"
+      thumbTintColor="#FFFFFF00"
+      onSlidingComplete={handleSlidingComplete}
+    />
+  </View>
 
-          {/* controls */}
-          <View style={styles.controlsContainer}>
-            <View style={styles.playButtonContainer}>
-              <PlayPause isPlaying={isPlaying} onPress={handlePlayPause} />
-            </View>
-            <View style={styles.seekbarContainer}>
-              <Slider
-                style={{ width: scale * 200, height: scale * 20 }}
-                minimumValue={0}
-                maximumValue={1}
-                value={duration ? currentTime / duration : 0}
-                minimumTrackTintColor="#FFFFFF"
-                maximumTrackTintColor="#000000"
-                thumbTintColor="#FFFFFF00"
-                onSlidingComplete={handleSlidingComplete}
-              />
-            </View>
-            <ReplayButton onPress={handleReplay} />
-          </View>
+  {/* resterende tijd */}
+  <View style={styles.timeLabelRemaining}>
+    <Text style={styles.timeText}>-{formatTime(duration - currentTime)}</Text>
+  </View>
 
+  {/* replay-knop */}
+  <ReplayButton onPress={handleReplay} />
+</View>
+
+  
           {/* info overlay */}
           <View style={styles.infoOverlay}>
             <Text style={styles.postTitle}>{post.title}</Text>
@@ -542,44 +490,128 @@ const PostComponent: React.FC<PostProps> = ({
               </TouchableOpacity>
             )}
           </View>
-
-          {/* action buttons */}
+  
+          {/* tags-overlay bottom-left */}
+          <View style={styles.tagsOverlay}>
+            <TouchableOpacity onPress={expandArtistTags}>
+              <View style={styles.artistTagsContainer}>
+                {post.artistTags?.map((tagId, index) => {
+                  const foundTag = artistTags.find((t) => t.id === tagId);
+                  if (!foundTag) return null;
+                  const animatedMargin =
+                    index === 0
+                      ? 0
+                      : toggleAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-10, 0],
+                        });
+                  return (
+                    <Animated.View
+                      key={foundTag.id}
+                      style={{ marginLeft: animatedMargin }}
+                    >
+                      <ArtistTag
+                        id={foundTag.id}
+                        name={foundTag.name}
+                        image={foundTag.image}
+                        disableModuleOpen={!artistExpanded}
+                      />
+                    </Animated.View>
+                  );
+                })}
+              </View>
+            </TouchableOpacity>
+  
+            <TouchableOpacity onPress={collapseArtistTags}>
+              <View style={styles.genreTagsContainer}>
+                {post.genreTags?.map((tagId, index) => {
+                  const foundTag = genreTags.find((t) => t.id === tagId);
+                  if (!foundTag) return null;
+                  const animatedMargin =
+                    index === 0
+                      ? 0
+                      : toggleAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [2, -20],
+                        });
+                  return (
+                    <Animated.View
+                      key={foundTag.id}
+                      style={{ marginLeft: animatedMargin }}
+                    >
+                      <GenreTag id={foundTag.id} name={foundTag.name} />
+                    </Animated.View>
+                  );
+                })}
+              </View>
+            </TouchableOpacity>
+          </View>
+  
+          {/* acties-overlay bottom-right */}
           {currentUserId && (
-            <>
-              <TouchableOpacity
-                style={[styles.iconButton, styles.likeButton]}
-                onPress={() => {}}
-              >
+            <View style={styles.actionsOverlay}>
+              <TouchableOpacity style={styles.likeButton}>
                 <Like
                   postId={post.id}
                   userId={currentUserId}
                   receiverId={post.userId}
                 />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.iconButton, styles.saveButton]}
-                onPress={() => {}}
-              >
+              <TouchableOpacity style={styles.saveButton}>
                 <SaveButton postId={post.id} userId={currentUserId} />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.iconButton, styles.followButton]}
-                onPress={() => {}}
-              >
+              <TouchableOpacity style={styles.followButton}>
                 <Follow
                   followerId={currentUserId}
                   followingId={post.userId}
                 />
               </TouchableOpacity>
-            </>
+            </View>
           )}
         </Pressable>
-
+  
         {/* timestamp */}
         <View style={styles.timestampContainer}>
           <Timestamp timestamp={post.timestamp} />
         </View>
+  
+        {/* header overlay */}
+        <View style={styles.postHeaderOverlay}>
+          <View style={styles.profileContainer}>
+            <ProfileLink userId={post.userId}>
+              <Image
+                source={{ uri: post.profileImage }}
+                style={{
+                  width: scale * 25,
+                  height: scale * 25,
+                  borderRadius: scale * 15,
+                }}
+              />
+            </ProfileLink>
+            <ProfileLink userId={post.userId}>
+              <View style={styles.userInfo}>
+                <Text style={styles.usernameText}>{post.username}</Text>
+                <Text style={styles.displayNameText}>
+                  {post.display_name} <Text style={styles.dot}>•</Text>{" "}
+                  {post.role}
+                </Text>
+              </View>
+            </ProfileLink>
+          </View>
+          <View style={styles.headerTags}>
+            {/* …animated header tags (unchanged)… */}
+          </View>
+          <View style={styles.headerDivider} />
+        </View>
 
+         {/* MoreOptions tussen profile en collab */}
+    <TouchableOpacity style={styles.moreOptionsButton}>
+      <MoreOptions
+        style={styles.moreOptionsButton}
+        menuStyle={{ top: scale * 575, left: scale * 115 }}
+      />
+    </TouchableOpacity>
+  
         {/* collab button */}
         <View style={styles.collabContainer}>
           {currentUserId ? (
@@ -597,6 +629,8 @@ const PostComponent: React.FC<PostProps> = ({
       </View>
     </View>
   );
+  
+  
 };
 
 const styles = StyleSheet.create({
@@ -605,6 +639,8 @@ const styles = StyleSheet.create({
     width: windowWidth,
     height: windowHeight,
     backgroundColor: "#000",
+    transform: [{ translateY: -85 }]
+  
   },
   blackBottom: {
   position: "absolute",
@@ -614,35 +650,33 @@ const styles = StyleSheet.create({
   bottom: 0,
   backgroundColor: "#121212",
   zIndex: 0,  // onder je postContainer (die zIndex 2 heeft)
+  
   },
 
   postContainer: {
     backgroundColor: "transparant",
     borderRadius: scale * 15,
-    padding: scale * 10,
     marginBottom: scale * 20,
     height: scale * 620,
     width: scale * 365,
     alignSelf: "center",
-    transform: [{ translateY: +110 }],
+    
+  
     
 
   },
   postHeaderOverlay: {
-    position: "absolute",
-    marginTop: 5,
-    width: "100%",
-    height: scale * 32,
+    paddingHorizontal: scale * 10,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: scale * 10,
-    backgroundColor: "transparent",
-    zIndex: 1,
+    height: scale * 40,
+    transform: [{ translateY: -15 }]
+    
   },
+  
   blurBackground: {
     position: "absolute",
-    top: 0,
     left: 0,
     right: 0,
     height: scale * 42,
@@ -652,10 +686,12 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: scale * 10,
     overflow: "hidden",
     zIndex: 0,
+
+
   },
   headerDivider: {
     position: "absolute",
-    bottom: -6,
+    bottom: -5,
     left: scale * 10,
     right: scale * 10,
     height: StyleSheet.hairlineWidth * 2,
@@ -667,15 +703,18 @@ const styles = StyleSheet.create({
   },
   userInfo: {
     marginLeft: scale * 5,
+    marginTop: scale * 2
   },
   usernameText: {
     color: "white",
     fontSize: scale * 12,
     fontWeight: "bold",
+    
   },
   displayNameText: {
     color: "white",
-    fontSize: scale * 10,
+    fontSize: scale * 8,
+    
   },
   dot: {
     marginHorizontal: scale * 3,
@@ -684,24 +723,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  artistTagsContainerHeader: {
+  artistTagsContainer: {
     flexDirection: "row",
     alignItems: "center",
   },
-  genreTagsContainerHeader: {
+  genreTagsContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: scale * 5,
+    marginLeft: scale * 10,
   },
   mediaContainer: {
-    width: scale * 340,
+    width: windowWidth,
     borderRadius: scale * 10,
     overflow: "hidden",
     backgroundColor: "#000",
-    marginBottom: scale * 10,
-    height: scale * 530,
+    height: scale * 570 ,
     alignSelf: "center",
     position: "relative",
+    marginTop : scale * 85,
+
+
    
     
   },
@@ -713,7 +754,7 @@ const styles = StyleSheet.create({
   },
   controlsContainer: {
     position: "absolute",
-    bottom: scale * 2,
+    bottom: scale * 10,
     left: scale * 10,
     right: scale * 10,
     flexDirection: "row",
@@ -726,19 +767,40 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     bottom: scale * 10,
-    right: 8,
+    right: scale * 25,
+    opacity: 0
   },
   seekbarContainer: {
     width: scale * 200,
-  },
+    right: scale * 10
+ },
+
+ timeLabelCurrent: {
+  width: scale * 40,
+  alignItems: "center",
+  right: scale * 5
+},
+timeLabelRemaining: {
+  width: scale * 40,
+  alignItems: "center",
+  left: scale * 40
+},
+ timeText: {
+  color: "white",
+  fontSize: scale * 12,
+
+},
+
   placeholder: {
     width: scale * 40,
     height: scale * 40,
+
+    
   },
   infoOverlay: {
     position: "absolute",
-    bottom: scale * 45,
-    left: scale * 10,
+    bottom: scale * 120,
+    left: scale * 2,
     right: scale * 10,
     backgroundColor: "rgba(0,0,0,0.0)",
     borderRadius: scale * 5,
@@ -749,16 +811,13 @@ const styles = StyleSheet.create({
     fontSize: scale * 16,
     fontWeight: "bold",
     marginBottom: scale * 5,
-    textShadowColor: "#000",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 1,
+    
+   
   },
   postDescription: {
     color: "white",
     fontSize: scale * 14,
-    textShadowColor: "#000",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 1,
+  
   },
   hiddenText: {
     position: "absolute",
@@ -771,43 +830,52 @@ const styles = StyleSheet.create({
     marginTop: scale * 4,
     textDecorationLine: "underline",
   },
+  tagsOverlay: {
+    position: "absolute",
+    bottom: scale * 70,
+    left: scale * 10,
+    flexDirection: "row",
+    alignItems: "center",
+    zIndex: 2,
+  },
+  actionsOverlay: {
+    position: "absolute",
+    bottom: scale * 72,   // pas aan naar wens
+    left: scale * 280,
+    flexDirection: "row",
+    alignItems: "center",
+    zIndex: 2,
+  },
+  
   timestampContainer: {
     marginVertical: scale * 5,
     alignItems: "center",
     bottom: scale * 8,
     opacity: 0,
   },
-  actionButtonsOverlay: {
-    position: "absolute",
-    right: scale * 10,
-    top: "50%",
-    transform: [{ translateY: -((scale * 30 * 3 + scale * 8 * 2) / 2) }],
-    flexDirection: "column",
-    alignItems: "center",
-    zIndex: 2,
-  },
-  iconButton: {
-    marginVertical: scale * 50,
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-  },
+
   likeButton: {
-    top: scale * 170,
-    right: scale * 10,
+    right: scale * 20
+
   },
   saveButton: {
-    top: scale * 220,
-    right: scale * 10,
+    right: scale * 2,
+
   },
   followButton: {
-    top: scale * 265,
-    right: scale * 5,
+  left: scale * 15,
+
+  },
+  moreOptionsButton: {
+   right: scale * 85,
+   transform: [{ translateY: -28 }]
+   
   },
   collabContainer: {
-    alignItems: "center",
-    marginBottom: scale * 10,
+    position: "absolute",
+    left: scale * 265,
+    top : scale * 672,
+    width: scale * 91
   },
   collabDisabled: {
     opacity: 0.5,

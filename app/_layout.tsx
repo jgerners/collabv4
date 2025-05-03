@@ -10,6 +10,9 @@ import { RootStackParamList } from '../routes';
 import { AuthProvider, useAuth } from '../context/authContext'; // ✅ Import AuthContext
 import  EditProfile  from "./screens/editprofile";
 
+import FeedHeader from '../headers/FeedHeader';
+
+
 import { StatusBar } from 'expo-status-bar';
 
 // 📌 Screens Importeren
@@ -36,59 +39,80 @@ function TabsLayout() {
 
   return (
     <Tab.Navigator
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+      screenOptions={({ route }) => ({
+        tabBarShowLabel: false,
+        tabBarActiveTintColor: '#FFFFFF',
+        tabBarInactiveTintColor: '#FFFFFF',
         headerShown: true,
         headerTransparent: true,
-        headerStyle: { height: 110, },
-        
+        headerStyle: { height: 110 },
         headerTitleAlign: 'center',
         headerTitleStyle: {
-          fontSize: 25,
+          fontSize: 20,
           fontWeight: 'bold',
           color: 'white',
         },
-       
         tabBarBackground: () => (
           <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
         ),
         tabBarStyle: Platform.select({
-          ios: { position: 'absolute', height: 80, backgroundColor: 'rgba(0, 0, 0, 0.81)',  borderTopWidth: 0, },
-          default: { height: 80, backgroundColor: 'rgba(17, 17, 17, 0.81)' }
+          ios: {
+            position: 'absolute',
+            height: 60,
+            backgroundColor: 'rgba(6, 6, 6, 0.81)',
+            borderTopWidth: 0,
+          },
+          default: {
+            height: 60,
+            backgroundColor: 'rgba(17, 17, 17, 0.81)',
+          },
         }),
-      }}
+        tabBarIcon: ({ focused, color }) => {
+          // bepaal de juiste SF-Symbol-naam als string
+          let iconName: string;
+          switch (route.name) {
+            case 'Feed':
+              iconName = focused ? 'house.fill' : 'house';
+              break;
+            case 'COLLABS!':
+              iconName = focused
+                ? 'bubble.left.and.bubble.right.fill'
+                : 'bubble.left.and.bubble.right';
+              break;
+            case 'Profile':
+              iconName = focused
+                ? 'person.crop.circle.fill'
+                : 'person.crop.circle';
+              break;
+            case 'Upload':
+              iconName = focused
+                ? 'arrow.up.circle.fill'
+                : 'arrow.up.circle';
+              break;
+            default:
+              iconName = 'questionmark';
+          }
+          // cast naar any om de union-type check te omzeilen
+          return <IconSymbol name={iconName as any} size={22} color={color} />;
+        },
+      })}
     >
       <Tab.Screen
-        name="Feed"
-        component={FeedScreen}
-        options={{
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-          
-        }}
-      />
-      <Tab.Screen
-        name="Chats"
-        component={ChatListScreen}
-        options={{
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="bubble.left.and.bubble.right.fill" color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.crop.circle.fill" color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Upload"
-        component={UploadScreen}
-        options={{
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="arrow.up.circle.fill" color={color} />,
-        }}
-      />
+  name="Feed"
+  component={FeedScreen}
+  options={{
+    headerShown: false,    // ← hieruit halen dat doorzichtig headerje
+           }}
+       />
+      <Tab.Screen name="COLLABS!" component={ChatListScreen} />
+      <Tab.Screen 
+      name="Profile" 
+      options={{headerShown: false}}
+      component={ProfileScreen} />
+      <Tab.Screen name="Upload" component={UploadScreen} />
     </Tab.Navigator>
   );
+  
 }
 
 // ✅ AppNavigatie met Auth-check
@@ -123,7 +147,7 @@ function AuthNavigator() {
             component={ChatScreen}
             options={{
               headerShown: true,
-              headerTitle: "Chat",
+              headerTitle: "chat",
               headerBackTitle: "",
               headerTintColor: "white",
               headerStyle: { backgroundColor: "rgba(0,0,0,0.8)" },

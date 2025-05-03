@@ -16,7 +16,7 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
   const [status, setStatus] = useState<"none" | "pending" | "accepted" | "rejected">("none");
 
   const [fontsLoaded] = useFonts({
-    'Oswald-Regular': require('../../assets/fonts/Oswald-VariableFont_wght.ttf'),
+    'BebasNeue-Regular': require('../../assets/fonts/BebasNeue-Regular.ttf'),
   }); 
 
 
@@ -142,24 +142,23 @@ const styles = StyleSheet.create({
   },
   collabButton: {
     paddingVertical: 3,
-    borderRadius: 15,
-    height: 30,
-    width: 120,
+    borderRadius: 12,
+    height: 28,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#7602b5"
+
     
    
     
   },
   collabText: {
     color: "white",
-    fontSize: 18,
+    fontSize: 16,
     textAlign: "center",
-    fontFamily: 'Oswald-VariableFont_wght',
+    fontFamily: 'Boldonse-Regular',
     fontWeight: 'bold',
-    bottom: 1
+    left: 1
+   
   },
 });
 

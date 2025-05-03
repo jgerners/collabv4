@@ -22,9 +22,9 @@ const PlayPause: React.FC<PlayPauseProps> = ({ isPlaying, onPress }) => {
 
 const styles = StyleSheet.create({
   playButton: {
-    position: "absolute",
-    top: "45%",
-    left: "45%",
+    left: 20,
+    transform: [{ translateY: 10 }],
+  
   },
 });
 

@@ -18,9 +18,12 @@ const styles = StyleSheet.create({
   button: {
     width: 30,
     height: 30,
-    transform: [{ translateY: -1 }],
+
+    transform: [{ translateY: -2 }],
     alignItems: 'center',
     justifyContent: 'center',
+    opacity: 0
+   
   },
 });
 

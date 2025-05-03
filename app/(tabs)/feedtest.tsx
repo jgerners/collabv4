@@ -1,3 +1,4 @@
+// FeedScreen.tsx
 import React, { useRef, useState, useEffect } from "react";
 import {
   View,
@@ -15,14 +16,11 @@ import { useGenreTags } from "../../hooks/useGenreTags";
 import { usePosts } from "../../hooks/useFeedPosts"; // De hook met batch loading (PAGE_SIZE = 20)
 import { ActivePostProvider, useActivePost } from "../../context/activePostContext";
 import { Audio } from "expo-av";
-// Importeer de cache helper
 import { setCachedAudio } from "../../helpers/audioCache";
-
-import { useLayoutEffect } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import FeedHeader from "../../headers/FeedHeader"; // Jouw nieuwe header component
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get("window");
-// nu één item = volledige device‐hoogte
+// Één item = volledige device‐hoogte
 const itemLength = windowHeight;
 const scale = windowWidth / 370;
 
@@ -46,71 +44,33 @@ const FeedScreenContent: React.FC = () => {
     loading: genreLoading,
     error: genreError,
   } = useGenreTags();
+
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState(1); // 0=Friends,1=Feed,2=Filters
+
   const isFocused = useIsFocused();
-
-  // Ref om bij te houden welke posts al gepreloaded zijn
   const preloadedPosts = useRef<{ [key: string]: boolean }>({});
-
-  // FlatList ref zodat we programatisch kunnen scrollen
   const flatListRef = useRef<FlatList>(null);
 
-  const activeIndex = posts.findIndex((p) => p.id === activePostId);
-
-  useEffect(() => {
-    if (posts.length > 0 && activePostId === null) {
-      setActivePostId(posts[0].id);
-    }
-  }, [posts, activePostId, setActivePostId]);
-
-  // Preload media en sla audio in de cache op
+  // Preload media
   useEffect(() => {
     posts.forEach((post) => {
       if (!preloadedPosts.current[post.id]) {
         preloadedPosts.current[post.id] = false;
-
         if (post.mediaType === "video" && post.mediaUrl) {
           fetch(post.mediaUrl.toString())
-            .then(() => {
-              console.log(
-                `Video media succesvol voorgepreloaded voor post ${post.id}`
-              );
-              preloadedPosts.current[post.id] = true;
-            })
-            .catch((err) => {
-              console.error(
-                "Fout bij preloading video voor post",
-                post.id,
-                err
-              );
-              preloadedPosts.current[post.id] = false;
-            });
+            .then(() => (preloadedPosts.current[post.id] = true))
+            .catch(() => (preloadedPosts.current[post.id] = false));
         } else if (post.mediaType === "photo" && post.audio) {
           Audio.Sound.createAsync(
-            {
-              uri:
-                typeof post.audio === "string"
-                  ? post.audio
-                  : post.audio!.toString(),
-            },
+            { uri: typeof post.audio === "string" ? post.audio : post.audio!.toString() },
             { shouldPlay: false }
           )
             .then(({ sound }) => {
-              console.log(
-                `Audio succesvol voorgepreloaded voor post ${post.id}`
-              );
               preloadedPosts.current[post.id] = true;
-              // Sla de geladen audio op in de cache
               setCachedAudio(post.id, sound);
             })
-            .catch((err) => {
-              console.error(
-                "Fout bij preloading audio voor post",
-                post.id,
-                err
-              );
-              preloadedPosts.current[post.id] = false;
-            });
+            .catch(() => (preloadedPosts.current[post.id] = false));
         } else {
           preloadedPosts.current[post.id] = true;
         }
@@ -118,24 +78,25 @@ const FeedScreenContent: React.FC = () => {
     });
   }, [posts]);
 
-  const viewabilityConfig = { itemVisiblePercentThreshold: 70 };
+  // Stel eerste post in als actief
+  useEffect(() => {
+    if (posts.length > 0 && activePostId === null) {
+      setActivePostId(posts[0].id);
+    }
+  }, [posts, activePostId]);
+
+  const activeIndex = posts.findIndex((p) => p.id === activePostId);
+
   const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: any[]; changed: any[] }) => {
-      if (viewableItems && viewableItems.length > 0) {
-        const activeItem = viewableItems[0].item;
-        setActivePostId(activeItem.id);
-        console.debug(
-          "[DEBUG] Active post set via onViewableItemsChanged:",
-          activeItem.id
-        );
+    ({ viewableItems }: { viewableItems: any[] }) => {
+      if (viewableItems.length > 0) {
+        setActivePostId(viewableItems[0].item.id);
       }
     }
   ).current;
 
   const handleEndReached = () => {
-    if (!loadingMore) {
-      loadMorePosts();
-    }
+    if (!loadingMore) loadMorePosts();
   };
 
   const onRefresh = async () => {
@@ -144,18 +105,27 @@ const FeedScreenContent: React.FC = () => {
     setRefreshing(false);
   };
 
-  // Handler voor het nauwkeurig snappen naar de dichtstbijzijnde post
-  const onMomentumScrollEnd = (e: any) => {
-    const offsetY = e.nativeEvent.contentOffset.y;
+  const onMomentumScrollEnd = ({ nativeEvent }: any) => {
+    const offsetY = nativeEvent.contentOffset.y;
     const index = Math.round(offsetY / itemLength);
-    if (flatListRef.current) {
-      flatListRef.current.scrollToOffset({
-        offset: index * itemLength,
-        animated: true,
-      });
-    }
+    flatListRef.current?.scrollToOffset({ offset: index * itemLength, animated: true });
   };
 
+  // Als niet-Feed tab actief, toon placeholder
+  if (activeTab !== 1) {
+    return (
+      <View style={styles.container}>
+        <FeedHeader onTabChange={setActiveTab} />
+        <View style={styles.placeholder}>
+          <Text style={styles.placeholderText}>
+            {activeTab === 0 ? "Friends-pagina komt hier" : "Filters-pagina komt hier"}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // initial loading
   if (initialLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
@@ -164,30 +134,23 @@ const FeedScreenContent: React.FC = () => {
     );
   }
 
+  // foutmelding
   if (error || artistError || genreError) {
     return (
       <View style={styles.container}>
         <Text style={{ color: "red" }}>
-          ❌ Fout bij laden van posts: {error || artistError || genreError}
+          ❌ Fout bij laden: {error || artistError || genreError}
         </Text>
       </View>
     );
   }
 
-  const renderFooter = () => {
-    if (loadingMore && posts.length > 0) {
-      return (
-        <View style={styles.footer}>
-          <ActivityIndicator size="small" color="white" />
-          <Text style={{ color: "white", marginTop: 5 }}>Laden...</Text>
-        </View>
-      );
-    }
-    return null;
-  };
-
   return (
     <View style={styles.container}>
+      {/* Header */}
+      <FeedHeader onTabChange={setActiveTab} />
+
+      {/* Feed-content */}
       <FlatList
         ref={flatListRef}
         data={posts}
@@ -196,18 +159,7 @@ const FeedScreenContent: React.FC = () => {
           const isWithinPreloadRange = Math.abs(index - activeIndex) <= 4;
           return (
             <PostComponent
-              post={{
-                ...item,
-                userId: item.userId,
-                username: item.username || "Onbekend",
-                display_name: item.display_name,
-                role: item.role,
-                profileImage:
-                  item.profileImage || "https://via.placeholder.com/50",
-                artistTags: item.artistTags ?? [],
-                genreTags: item.genreTags ?? [],
-                timestamp: item.timestamp.toString(),
-              }}
+              post={{ ...item, timestamp: item.timestamp.toString() }}
               isActive={activePostId === item.id}
               artistTags={artistTags}
               genreTags={genreTags}
@@ -216,26 +168,26 @@ const FeedScreenContent: React.FC = () => {
             />
           );
         }}
-        decelerationRate="fast" // Kan helpen voor consistente scrolling
+        decelerationRate="fast"
         snapToAlignment="start"
         showsVerticalScrollIndicator={false}
-        getItemLayout={(data, index) => ({
-          length: itemLength,
-          offset: itemLength * index,
-          index,
-        })}
+        getItemLayout={(_, idx) => ({ length: itemLength, offset: itemLength * idx, index: idx })}
         snapToInterval={itemLength}
         pagingEnabled
-        disableIntervalMomentum={true}  // Deze prop zorgt ervoor dat maar 1 post per keer wordt gescrold
-        
+        disableIntervalMomentum
         onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
+        viewabilityConfig={{ itemVisiblePercentThreshold: 70 }}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.1}
-        ListFooterComponent={renderFooter}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.footer}>
+              <ActivityIndicator size="small" color="white" />
+              <Text style={{ color: "white", marginTop: 5 }}>Laden...</Text>
+            </View>
+          ) : null
         }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         onMomentumScrollEnd={onMomentumScrollEnd}
       />
     </View>
@@ -243,40 +195,17 @@ const FeedScreenContent: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#121212" },
-  loadingContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: scale * 350,
-    position: "absolute",
-    zIndex: 9999,
-  },
-  footer: {
-    paddingVertical: 20,
-    alignItems: "center",
-  },
+  container: { flex: 1, backgroundColor: "black" },
+  loadingContainer: { justifyContent: "center", alignItems: "center" },
+  footer: { paddingVertical: 20, alignItems: "center" },
+  placeholder: { flex: 1, justifyContent: "center", alignItems: "center" },
+  placeholderText: { color: "#888", fontSize: 18 },
 });
 
-const FeedScreen: React.FC = () => {
-  const navigation = useNavigation();
-
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerTransparent: true,
-      headerTitle: 'Feed',
-      headerShadowVisible: false,
-      headerTintColor: '#fff',
-    });
-  }, [navigation]);
-
-  return (
-    <ActivePostProvider>
-      <FeedScreenContent />
-    </ActivePostProvider>
-  );
-};
+const FeedScreen: React.FC = () => (
+  <ActivePostProvider>
+    <FeedScreenContent />
+  </ActivePostProvider>
+);
 
 export default FeedScreen;

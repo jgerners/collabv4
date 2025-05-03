@@ -3,6 +3,7 @@ import React from 'react';
 import { TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
+
 interface ProfileLinkProps {
   userId: string;
   children: React.ReactNode;

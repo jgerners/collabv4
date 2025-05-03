@@ -211,19 +211,19 @@ const ChatsListScreen: React.FC = () => {
 export default ChatsListScreen;
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#121212" },
+  safeArea: { flex: 1, backgroundColor: "black" },
   tabSelector: {
     flexDirection: "row",
     justifyContent: "space-evenly",
-    backgroundColor: "#1E1E1E",
+    backgroundColor: "black",
     paddingVertical: 10,
     borderRadius: 10,
     margin: 16,
     marginTop: 70,
   },
-  tabButton: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
+  tabButton: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 15 },
   activeTab: { backgroundColor: "#A020F0" },
-  tabText: { color: "#B0B0B0", fontWeight: "bold" },
+  tabText: { color: "white", fontWeight: "bold" },
   activeTabText: { color: "#FFF" },
   chatItem: {
     flexDirection: "row",

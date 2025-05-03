@@ -38,7 +38,7 @@ const getPresignedUrl = async (
 ): Promise<string | null> => {
   try {
     const response = await fetch(
-      `http://192.168.178.94:3000/get-presigned-url?fileName=${encodeURIComponent(
+      `http://192.168.178.38:3000/get-presigned-url?fileName=${encodeURIComponent(
         uniqueName
       )}&contentType=${encodeURIComponent(contentType)}`
     );
@@ -510,7 +510,7 @@ const UploadScreen: React.FC = () => {
 export default UploadScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#121212" },
+  container: { flex: 1, backgroundColor: "black" },
   contentContainer: {
     flexGrow: 1,
     justifyContent: "center",
@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
   toggleContainer: {
     flexDirection: "row",
     justifyContent: "center",
-    backgroundColor: "#1E1E1E",
+    backgroundColor: "black",
     padding: 6,
     borderRadius: 10,
     marginBottom: 10,
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     color: "#FFF",
   },
   previewCard: {
-    backgroundColor: "#121212",
+    backgroundColor: "black",
     borderRadius: 15,
     padding: 10,
     width: "90%",

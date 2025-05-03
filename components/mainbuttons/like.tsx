@@ -8,6 +8,8 @@ import {
 import Icon from "react-native-vector-icons/Ionicons";
 import { useLike } from "../../hooks/useLike";
 
+import * as Haptics from 'expo-haptics';
+
 interface LikeProps {
   postId: string;
   userId: string;
@@ -19,7 +21,13 @@ const Like: React.FC<LikeProps> = ({ postId, userId, receiverId }) => {
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const handlePress = () => {
+  
+
+  const handlePress = async () => {
+
+  // 1. Voel een lichte haptic-feedback
+  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
     // Start animatie
     Animated.sequence([
       Animated.timing(scaleAnim, {
@@ -46,7 +54,7 @@ const Like: React.FC<LikeProps> = ({ postId, userId, receiverId }) => {
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         <Icon
           name={liked ? "heart" : "heart-outline"}
-          size={25}
+          size={26}
           color={liked ? "red" : "white"}
         />
       </Animated.View>

@@ -4,6 +4,8 @@ import { TouchableOpacity, StyleSheet, ActivityIndicator, View, Text } from "rea
 import { useFollow } from "../../hooks/useFollow";
 import { Ionicons } from '@expo/vector-icons';
 
+
+
 interface FollowProps {
   followerId: string;
   followingId: string;
@@ -11,6 +13,8 @@ interface FollowProps {
 
 const Follow: React.FC<FollowProps> = ({ followerId, followingId }) => {
   const { isFollowing, loading, error, toggleFollow } = useFollow({ followerId, followingId });
+
+
 
   if (loading) {
     return <ActivityIndicator size="small" color="gray" />;
@@ -21,7 +25,7 @@ const Follow: React.FC<FollowProps> = ({ followerId, followingId }) => {
       <TouchableOpacity onPress={toggleFollow} style={styles.iconButton}>
         <Ionicons
           name={isFollowing ? "checkmark-circle" : "person-add-outline"}
-          size={24}
+          size={22}
           color="white"
         />
       </TouchableOpacity>
@@ -35,13 +39,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconButton: {
-    padding: 8,
+    
   },
   errorText: {
     color: 'red',
     fontSize: 12,
     marginTop: 4,
-    textAlign: 'center',
+    textAlign: 'center'
   },
 });
 
