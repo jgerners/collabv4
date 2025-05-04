@@ -12,6 +12,7 @@ import  EditProfile  from "./screens/editprofile";
 
 import FeedHeader from '../headers/FeedHeader';
 
+import UploadNavigator from '../navigation/UploadNavigator';
 
 import { StatusBar } from 'expo-status-bar';
 
@@ -109,7 +110,7 @@ function TabsLayout() {
       name="Profile" 
       options={{headerShown: false}}
       component={ProfileScreen} />
-      <Tab.Screen name="Upload" component={UploadScreen} />
+      <Tab.Screen name="Upload" component={UploadNavigator} />
     </Tab.Navigator>
   );
   
