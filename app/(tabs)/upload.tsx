@@ -355,6 +355,13 @@ const UploadScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+       {/* Close-knop bovenaan */}
+       <TouchableOpacity
+        style={styles.closeBtn}
+        onPress={() => navigation.goBack()}
+      >
+        <Text style={styles.closeTxt}>×</Text>
+      </TouchableOpacity>
       <KeyboardAwareScrollView
         contentContainerStyle={styles.contentContainer}
         extraScrollHeight={20}
@@ -517,6 +524,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     transform: [{ translateY: -20 }],
     paddingBottom: 20,
+  },
+  closeBtn: {
+    position: 'absolute',
+    bottom: 720,
+    right: 16,
+    zIndex: 10,
+    padding: 8,
+  },
+  closeTxt: {
+    color: 'white',
+    fontSize: 28,
+    lineHeight: 28,
   },
   toggleContainer: {
     flexDirection: "row",

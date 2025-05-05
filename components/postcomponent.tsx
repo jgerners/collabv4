@@ -696,6 +696,7 @@ const styles = StyleSheet.create({
     right: scale * 10,
     height: StyleSheet.hairlineWidth * 2,
     backgroundColor: "rgba(255,255,255,0.6)",
+    opacity: 0
   },
   profileContainer: {
     flexDirection: "row",

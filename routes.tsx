@@ -7,6 +7,8 @@ export type RootStackParamList = {
 
     EditProfile: undefined;
    
+    SelectMediaModal: undefined
+    UploadFormModal : { mediaUri: string; mediaType: 'video' | 'photo' }
    
     Upload: {
       selectedArtistTags?: string[];

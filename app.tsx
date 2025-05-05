@@ -1,6 +1,6 @@
 import React from 'react';
 import { AuthProvider } from './context/authContext'; // Zorg dat het pad klopt
-import AppNavigator from './app/(tabs)/_layout'; // Dit is jouw layout.tsx als navigator
+import AppNavigator from './app/(tabs)/_Layout'; // Dit is jouw layout.tsx als navigator
 
 export default function App() {
   return (

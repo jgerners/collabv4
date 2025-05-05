@@ -3,9 +3,10 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Animated,
   Dimensions,
   StyleSheet,
+  LayoutChangeEvent,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,72 +21,129 @@ export interface FeedHeaderProps {
 const FeedHeader: React.FC<FeedHeaderProps> = ({ onTabChange }) => {
   const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState(1);
-  const indicator = useRef(new Animated.Value(1)).current;
+  const [layoutsReady, setLayoutsReady] = useState(false);
 
-  const tabs = ['Friends', 'Feed', 'Filters'];
+  // Animated values
+  const translateX = useRef(new Animated.Value(0)).current;
+  const bubbleWidth = useRef(new Animated.Value(0)).current;
 
+  // Layout refs
+  const parentLayouts = useRef<{ x: number; width: number }[]>([]);
+  const textLayouts = useRef<{ x: number; width: number }[]>([]);
+
+  // Constants
+  const BUBBLE_PADDING = 15;
+  const BUBBLE_VERTICAL_OFFSET = 3;
+  const BUBBLE_HORIZONTAL_OFFSET = 0;
+  const BUBBLE_HEIGHT = 32;
+  const BUBBLE_RADIUS = BUBBLE_HEIGHT / 2;
+  const HEADER_CONTENT_HEIGHT = 48;
+  const CONTAINER_HEIGHT = insets.top + HEADER_CONTENT_HEIGHT;
+  const BUBBLE_TOP = insets.top + (HEADER_CONTENT_HEIGHT - BUBBLE_HEIGHT) / 2 + BUBBLE_VERTICAL_OFFSET;
+
+  // Initialize bubble once layouts are measured
   useEffect(() => {
-    indicator.setValue(1);
-  }, []);
+    if (!layoutsReady) return;
+    const p = parentLayouts.current[activeIndex];
+    const t = textLayouts.current[activeIndex];
+    const initX = p.x + t.x - BUBBLE_PADDING + BUBBLE_HORIZONTAL_OFFSET;
+    const initW = t.width + BUBBLE_PADDING * 2;
+    translateX.setValue(initX);
+    bubbleWidth.setValue(initW);
+  }, [layoutsReady]);
 
   const handleTabPress = (index: number) => {
     setActiveIndex(index);
-    Animated.spring(indicator, {
-      toValue: index,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 80,
-    }).start();
     onTabChange?.(index);
+
+    const p = parentLayouts.current[index];
+    const t = textLayouts.current[index];
+    if (p && t) {
+      const targetX = p.x + t.x - BUBBLE_PADDING + BUBBLE_HORIZONTAL_OFFSET;
+      const targetW = t.width + BUBBLE_PADDING * 2;
+      Animated.parallel([
+        Animated.spring(translateX, {
+          toValue: targetX,
+          friction: 7,
+          tension: 40,
+          useNativeDriver: false,
+        }),
+        Animated.spring(bubbleWidth, {
+          toValue: targetW,
+          friction: 5,
+          tension: 80,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    }
   };
 
-  const INDICATOR_WIDTH = TAB_WIDTH * 0.2;
-  const HORIZONTAL_OFFSET = (TAB_WIDTH - INDICATOR_WIDTH) / 2;
+  const onParentLayout = (index: number) => (e: LayoutChangeEvent) => {
+    parentLayouts.current[index] = e.nativeEvent.layout;
+    if (parentLayouts.current.filter(Boolean).length === TAB_COUNT &&
+        textLayouts.current.filter(Boolean).length === TAB_COUNT) {
+      setLayoutsReady(true);
+    }
+  };
 
-  const translateX = indicator.interpolate({
-    inputRange: [0, 1, 2],
-    outputRange: [
-      HORIZONTAL_OFFSET,
-      TAB_WIDTH + HORIZONTAL_OFFSET,
-      2 * TAB_WIDTH + HORIZONTAL_OFFSET,
-    ],
-  });
+  const onTextLayout = (index: number) => (e: LayoutChangeEvent) => {
+    textLayouts.current[index] = e.nativeEvent.layout;
+    if (parentLayouts.current.filter(Boolean).length === TAB_COUNT &&
+        textLayouts.current.filter(Boolean).length === TAB_COUNT) {
+      setLayoutsReady(true);
+    }
+  };
+
+  const tabs = ['Friends', 'Feed', 'Filters'];
 
   return (
     <View
       style={[
         styles.container,
-        { paddingTop: insets.top + 8, height: insets.top + 48 },
+        {
+          paddingTop: insets.top + 8,
+          height: CONTAINER_HEIGHT,
+          paddingHorizontal: TAB_WIDTH * 0.2,
+        },
       ]}
     >
+      {/* Bubble */}
+      {layoutsReady && (
+        <Animated.View
+          style={[
+            styles.bubble,
+            {
+              height: BUBBLE_HEIGHT,
+              borderRadius: BUBBLE_RADIUS,
+              top: BUBBLE_TOP,
+              transform: [{ translateX }],
+              width: bubbleWidth,
+            },
+          ]}
+        />
+      )}
+
+      {/* Tabs */}
       {tabs.map((tab, idx) => (
         <TouchableOpacity
           key={tab}
           style={styles.tab}
+          onLayout={onParentLayout(idx)}
           activeOpacity={0.7}
           onPress={() => handleTabPress(idx)}
         >
           <Text
-            style={[
-              styles.tabText,
-              idx === activeIndex && styles.activeTabText,
-            ]}
+            onLayout={onTextLayout(idx)}
+            style={
+              idx === activeIndex
+                ? styles.activeTabText
+                : styles.tabText
+            }
           >
             {tab}
           </Text>
         </TouchableOpacity>
       ))}
-
-      <Animated.View
-        style={[
-          styles.indicator,
-          {
-            width: INDICATOR_WIDTH,
-            bottom: 2,
-            transform: [{ translateX }],
-          },
-        ]}
-      />
     </View>
   );
 };
@@ -93,30 +151,30 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({ onTabChange }) => {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: 'transparent',
     alignItems: 'center',
     position: 'relative',
   },
   tab: {
-    width: TAB_WIDTH * 0.7,  // b.v. 70% van je tab-breedte
     flex: 1,
-    marginHorizontal: 4,     // optionele kleine marge ertussen
     alignItems: 'center',
     justifyContent: 'center',
-    
   },
   tabText: {
     color: '#FFF',
     fontSize: 16,
-    fontWeight: '400',
+    fontWeight: '500',
+    zIndex: 1,
   },
   activeTabText: {
-    fontWeight: '700',
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+    zIndex: 1,
   },
-  indicator: {
+  bubble: {
     position: 'absolute',
-    height: 2,
-    backgroundColor: '#FFF',
+    backgroundColor: '#4800FF',
+    zIndex: 0,
   },
 });
 

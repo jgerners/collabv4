@@ -126,7 +126,7 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
         onLayout={startAnimation}
         start={{ x: animatedStartX, y: 0 }}
         end={{ x: 1, y: 0 }}
-        colors={["#4B0082", "#6A0DAD"]}
+        colors={["#4800FF", "#3D00D9"]}
       >
         <Text style={styles.collabText}>
           {status === "pending" ? "Request Sent" : "COLLAB!"}

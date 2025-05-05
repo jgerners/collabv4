@@ -1,3 +1,4 @@
+
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
@@ -10,9 +11,16 @@ import { RootStackParamList } from '../routes';
 import { AuthProvider, useAuth } from '../context/authContext'; // ✅ Import AuthContext
 import  EditProfile  from "./screens/editprofile";
 
+import * as Haptics from 'expo-haptics'
+import { useContext } from 'react'
+import { ZoomContext, ZoomProvider } from '../context/zoomContext'
+
 import FeedHeader from '../headers/FeedHeader';
 
 import UploadNavigator from '../navigation/UploadNavigator';
+
+import SelectMediaScreen from '../app/screens/SelectMediaScreen'
+
 
 import { StatusBar } from 'expo-status-bar';
 
@@ -33,10 +41,13 @@ import demoDetailScreen from './screens/demoDetailScreen';
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
+
+
 // ✅ Tab-navigatie (Alleen zichtbaar als de gebruiker is ingelogd)
 function TabsLayout() {
   const colorScheme = useColorScheme();
   const { profile } = useAuth(); // ✅ Profielfoto ophalen
+  const zoom = useContext(ZoomContext)!
 
   return (
     <Tab.Navigator
@@ -103,6 +114,7 @@ function TabsLayout() {
   component={FeedScreen}
   options={{
     headerShown: false,    // ← hieruit halen dat doorzichtig headerje
+
            }}
        />
       <Tab.Screen name="COLLABS!" component={ChatListScreen} />
@@ -110,7 +122,19 @@ function TabsLayout() {
       name="Profile" 
       options={{headerShown: false}}
       component={ProfileScreen} />
-      <Tab.Screen name="Upload" component={UploadNavigator} />
+      <Tab.Screen
+      name="Upload"
+      component={FeedScreen}
+      listeners={({ navigation }) => ({
+          tabPress: e => {
+          e.preventDefault();                         // voorkom echte tab‐switch
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+          zoom.zoomOut()
+          navigation.navigate('SelectMediaModal');    // open overlay‐modal
+                         },
+  })}                                          // ← sluit hier je listeners af
+/>
+      
     </Tab.Navigator>
   );
   
@@ -132,7 +156,13 @@ function AuthNavigator() {
 
   
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+    screenOptions={{
+      // alle schermen krijgen zwarte achtergrond onder je animatie
+      cardStyle: { backgroundColor: 'black' },
+    
+    }}>
+      
       {/* ✅ Als GEEN sessie → Toon Login/Register */}
       {!user ? (
         <>
@@ -141,8 +171,41 @@ function AuthNavigator() {
         </>
       ) : (
         <>
+        
+        
           {/* ✅ Als WEL sessie → Toon de hoofdapp */}
-          <Stack.Screen name="Main" component={TabsLayout} options={{ headerShown: false }} />
+           <Stack.Screen 
+              name="Main" 
+              component={TabsLayout} 
+              options={{ headerShown: false }}
+                                              />
+          
+     
+     
+          {/* 🔔 Overlay-modals bovenop je tabs */}
+         <Stack.Group
+           screenOptions={{
+           presentation: 'transparentModal',
+           cardStyle: { backgroundColor: 'transparent' },
+           
+            }}
+         >
+           {/* 1) Blur-overlay met gallery-sheet */}
+           <Stack.Screen
+              name="SelectMediaModal"
+              component={SelectMediaScreen}
+              options={{headerShown: false, }}
+           />
+            {/* 2) Fullscreen uploadpagina na selectie */}
+            <Stack.Screen
+              name="UploadFormModal"
+             component={UploadScreen}
+              options={{ 
+                presentation: 'card', 
+                headerShown: false}}
+            />
+          </Stack.Group>
+          
           <Stack.Screen 
             name="Chat" 
             component={ChatScreen}
@@ -200,13 +263,21 @@ function AuthNavigator() {
 export default function AppNavigator() {
   return (
     <AuthProvider>
+      <View style={styles.root}>
+      <ZoomProvider>
        <StatusBar style="light" backgroundColor="transparent" translucent />
       <AuthNavigator />
+      </ZoomProvider>
+      </View>
     </AuthProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
 
   headerBackground: {
     flex: 1,

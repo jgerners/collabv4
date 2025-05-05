@@ -20,9 +20,8 @@ import { setCachedAudio } from "../../helpers/audioCache";
 import FeedHeader from "../../headers/FeedHeader"; // Jouw nieuwe header component
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get("window");
-// Één item = volledige device‐hoogte
+// Één item = volledige device-hoogte
 const itemLength = windowHeight;
-const scale = windowWidth / 370;
 
 const FeedScreenContent: React.FC = () => {
   const {
@@ -111,20 +110,6 @@ const FeedScreenContent: React.FC = () => {
     flatListRef.current?.scrollToOffset({ offset: index * itemLength, animated: true });
   };
 
-  // Als niet-Feed tab actief, toon placeholder
-  if (activeTab !== 1) {
-    return (
-      <View style={styles.container}>
-        <FeedHeader onTabChange={setActiveTab} />
-        <View style={styles.placeholder}>
-          <Text style={styles.placeholderText}>
-            {activeTab === 0 ? "Friends-pagina komt hier" : "Filters-pagina komt hier"}
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
   // initial loading
   if (initialLoading) {
     return (
@@ -150,46 +135,65 @@ const FeedScreenContent: React.FC = () => {
       {/* Header */}
       <FeedHeader onTabChange={setActiveTab} />
 
-      {/* Feed-content */}
-      <FlatList
-        ref={flatListRef}
-        data={posts}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item, index }) => {
-          const isWithinPreloadRange = Math.abs(index - activeIndex) <= 4;
-          return (
-            <PostComponent
-              post={{ ...item, timestamp: item.timestamp.toString() }}
-              isActive={activePostId === item.id}
-              artistTags={artistTags}
-              genreTags={genreTags}
-              feedFocused={isFocused}
-              withinPreloadRange={isWithinPreloadRange}
-            />
-          );
-        }}
-        decelerationRate="fast"
-        snapToAlignment="start"
-        showsVerticalScrollIndicator={false}
-        getItemLayout={(_, idx) => ({ length: itemLength, offset: itemLength * idx, index: idx })}
-        snapToInterval={itemLength}
-        pagingEnabled
-        disableIntervalMomentum
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={{ itemVisiblePercentThreshold: 70 }}
-        onEndReached={handleEndReached}
-        onEndReachedThreshold={0.1}
-        ListFooterComponent={
-          loadingMore ? (
-            <View style={styles.footer}>
-              <ActivityIndicator size="small" color="white" />
-              <Text style={{ color: "white", marginTop: 5 }}>Laden...</Text>
-            </View>
-          ) : null
-        }
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        onMomentumScrollEnd={onMomentumScrollEnd}
-      />
+      {/* CONTENT TABS */}
+      <View style={styles.tabWrapper}>
+        {/* Friends */}
+        <View style={[styles.tabContent, { display: activeTab === 0 ? "flex" : "none" }]}>
+          <View style={styles.placeholder}>
+            <Text style={styles.placeholderText}>Friends-pagina komt hier</Text>
+          </View>
+        </View>
+
+        {/* Feed */}
+        <View style={[styles.tabContent, { display: activeTab === 1 ? "flex" : "none" }]}>
+          <FlatList
+            ref={flatListRef}
+            data={posts}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item, index }) => {
+              const isWithinPreloadRange = Math.abs(index - activeIndex) <= 4;
+              return (
+                <PostComponent
+                  post={{ ...item, timestamp: item.timestamp.toString() }}
+                  isActive={activePostId === item.id}
+                  artistTags={artistTags}
+                  genreTags={genreTags}
+                  feedFocused={isFocused && activeTab === 1}
+                  withinPreloadRange={isWithinPreloadRange}
+                />
+              );
+            }}
+            decelerationRate="fast"
+            snapToAlignment="start"
+            showsVerticalScrollIndicator={false}
+            getItemLayout={(_, idx) => ({ length: itemLength, offset: itemLength * idx, index: idx })}
+            snapToInterval={itemLength}
+            pagingEnabled
+            disableIntervalMomentum
+            onViewableItemsChanged={onViewableItemsChanged}
+            viewabilityConfig={{ itemVisiblePercentThreshold: 70 }}
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.1}
+            ListFooterComponent={
+              loadingMore ? (
+                <View style={styles.footer}>
+                  <ActivityIndicator size="small" color="white" />
+                  <Text style={{ color: "white", marginTop: 5 }}>Laden...</Text>
+                </View>
+              ) : null
+            }
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            onMomentumScrollEnd={onMomentumScrollEnd}
+          />
+        </View>
+
+        {/* Filters */}
+        <View style={[styles.tabContent, { display: activeTab === 2 ? "flex" : "none" }]}>
+          <View style={styles.placeholder}>
+            <Text style={styles.placeholderText}>Filters-pagina komt hier</Text>
+          </View>
+        </View>
+      </View>
     </View>
   );
 };
@@ -198,6 +202,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "black" },
   loadingContainer: { justifyContent: "center", alignItems: "center" },
   footer: { paddingVertical: 20, alignItems: "center" },
+
+  // wrapper rondom alle tab-content
+  tabWrapper: { flex: 1 },
+
+  tabContent: {
+    flex: 1,
+  },
+
   placeholder: { flex: 1, justifyContent: "center", alignItems: "center" },
   placeholderText: { color: "#888", fontSize: 18 },
 });
