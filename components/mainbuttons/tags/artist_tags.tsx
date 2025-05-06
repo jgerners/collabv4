@@ -94,10 +94,13 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     overflow: "hidden",
     backgroundColor: "#ccc",
+   
+    
   },
   image: {
     width: "100%",
     height: "100%",
+    
   },
   modalOverlay: {
     flex: 1,
@@ -150,6 +153,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+  
 });
 
 export default ArtistTag;

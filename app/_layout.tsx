@@ -15,6 +15,11 @@ import * as Haptics from 'expo-haptics'
 import { useContext } from 'react'
 import { ZoomContext, ZoomProvider } from '../context/zoomContext'
 
+import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+
+
 import FeedHeader from '../headers/FeedHeader';
 
 import UploadNavigator from '../navigation/UploadNavigator';
@@ -27,6 +32,7 @@ import { StatusBar } from 'expo-status-bar';
 // 📌 Screens Importeren
 import FeedScreen from './(tabs)/feedtest';
 import ProfileScreen from './(tabs)/profile';
+import search from './(tabs)/likes_test';
 import ChatListScreen from './(tabs)/chat_list';
 import ChatScreen from './screens/chat';
 import UserProfileScreen from './screens/userprofile';
@@ -49,6 +55,7 @@ function TabsLayout() {
   const { profile } = useAuth(); // ✅ Profielfoto ophalen
   const zoom = useContext(ZoomContext)!
 
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -70,42 +77,72 @@ function TabsLayout() {
         tabBarStyle: Platform.select({
           ios: {
             position: 'absolute',
-            height: 60,
+            height: 80,
             backgroundColor: 'rgba(6, 6, 6, 0.81)',
             borderTopWidth: 0,
+            paddingHorizontal: 25,      // <— minder zijdelingse ruimte
+            justifyContent: 'space-evenly', // <— verdeel items compacter
           },
           default: {
-            height: 60,
+            height: 80,
             backgroundColor: 'rgba(17, 17, 17, 0.81)',
+            paddingHorizontal: 25,      // <— minder zijdelingse ruimte
+            justifyContent: 'space-evenly', // <— verdeel items compacter
           },
         }),
+       
+        tabBarItemStyle: {
+             paddingTop: 8,      
+
+            },
+
+
+             
         tabBarIcon: ({ focused, color }) => {
           // bepaal de juiste SF-Symbol-naam als string
           let iconName: string;
           switch (route.name) {
             case 'Feed':
-              iconName = focused ? 'house.fill' : 'house';
-              break;
+              return (
+                <MaterialCommunityIcons
+                  name={focused ? 'home-variant' : 'home-variant-outline'}
+                  size={25}
+                  color={color}
+                />
+              );
             case 'COLLABS!':
               iconName = focused
                 ? 'bubble.left.and.bubble.right.fill'
                 : 'bubble.left.and.bubble.right';
               break;
+              case 'Search':
+                // Outline als inactive, solid Sharp als active
+                return (
+                  <Ionicons
+                    name={focused ? 'search-sharp' : 'search-outline'}
+                    size={25}
+                    color={color}
+                  />
+                );
             case 'Profile':
               iconName = focused
                 ? 'person.crop.circle.fill'
                 : 'person.crop.circle';
               break;
-            case 'Upload':
-              iconName = focused
-                ? 'arrow.up.circle.fill'
-                : 'arrow.up.circle';
-              break;
+              case 'Upload':
+                return (
+                  <View style={[
+                    styles.uploadBubble,
+                    focused && styles.uploadBubbleActive
+                  ]}>
+                    <Ionicons name="add" size={24} color={color} />
+                  </View>
+                );
             default:
               iconName = 'questionmark';
           }
           // cast naar any om de union-type check te omzeilen
-          return <IconSymbol name={iconName as any} size={22} color={color} />;
+          return <IconSymbol name={iconName as any} size={25} color={color} />;
         },
       })}
     >
@@ -118,10 +155,6 @@ function TabsLayout() {
            }}
        />
       <Tab.Screen name="COLLABS!" component={ChatListScreen} />
-      <Tab.Screen 
-      name="Profile" 
-      options={{headerShown: false}}
-      component={ProfileScreen} />
       <Tab.Screen
       name="Upload"
       component={FeedScreen}
@@ -134,6 +167,12 @@ function TabsLayout() {
                          },
   })}                                          // ← sluit hier je listeners af
 />
+      <Tab.Screen name="Search" component={search} />
+      <Tab.Screen 
+      name="Profile" 
+      options={{headerShown: false}}
+      component={ProfileScreen} />
+  
       
     </Tab.Navigator>
   );
@@ -288,5 +327,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#121212",
+  },
+  uploadBubble: {
+    width: 60,
+    height: 37,
+    borderRadius: 10,
+    backgroundColor: "#212121",
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uploadBubbleActive: {
+    backgroundColor: '#333',  // donkergrijs bubble
   },
 });

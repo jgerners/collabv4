@@ -403,7 +403,7 @@ const PostComponent: React.FC<PostProps> = ({
       {/* ───── fade van blur naar zwart ───── */}
       <LinearGradient
         colors={["transparent", "black"]}
-        locations={[0.5, 0.9]}
+        locations={[0.1, 0.2]}
         style={StyleSheet.absoluteFill}
       />
   
@@ -727,11 +727,27 @@ const styles = StyleSheet.create({
   artistTagsContainer: {
     flexDirection: "row",
     alignItems: "center",
+      // iOS shadow
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 3,
+  
+      // Android elevation
+      elevation: 4,
   },
   genreTagsContainer: {
     flexDirection: "row",
     alignItems: "center",
     marginLeft: scale * 10,
+      // iOS shadow
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 3,
+  
+      // Android elevation
+      elevation: 4,
   },
   mediaContainer: {
     width: windowWidth,
@@ -868,7 +884,7 @@ timeLabelRemaining: {
 
   },
   moreOptionsButton: {
-   right: scale * 85,
+   right: scale * 83,
    transform: [{ translateY: -28 }]
    
   },

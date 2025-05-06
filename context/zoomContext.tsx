@@ -14,7 +14,7 @@ export function ZoomProvider({ children }: { children: ReactNode }) {
 
   const zoomOut = () => {
     Animated.spring(scale, {
-      toValue: 0.97,
+      toValue: 0.98,
       useNativeDriver: true,
       overshootClamping: true,
       tension: 80,
