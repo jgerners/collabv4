@@ -18,6 +18,9 @@ export interface Post {
   timestamp: number;
   artistTags: string[];
   genreTags: string[];
+  like_count: number;
+  save_count: number;
+  follower_count: number;
   isLiked: boolean;
   isFollowed: boolean;
   isSaved: boolean;
@@ -49,11 +52,13 @@ export const usePosts = () => {
         timestamp,
         artistTags,
         genreTags,
+        like_count,
+        save_count,
         isLiked,
         isFollowed,
         isSaved,
         isPlaying,
-        profiles(username, profile_pic, display_name, role)
+        profiles(username, profile_pic, display_name, role, follower_count)
       `)
       .order("timestamp", { ascending: false })
       .range((pageNumber - 1) * PAGE_SIZE, pageNumber * PAGE_SIZE - 1);
@@ -80,6 +85,9 @@ export const usePosts = () => {
         timestamp: post.timestamp,
         artistTags: post.artistTags ?? [],
         genreTags: post.genreTags ?? [],
+        like_count: post.like_count,
+        save_count: post.save_count,
+        follower_count: post.profiles.follower_count,
         isLiked: post.isLiked,
         isFollowed: post.isFollowed,
         isSaved: post.isSaved,

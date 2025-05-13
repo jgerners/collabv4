@@ -18,8 +18,15 @@ import { useAuth } from "../context/authContext";
 import Slider from "@react-native-community/slider";
 import { setCurrentPlayingMedia, stopCurrentMedia } from "../PlaybackManager";
 
+import { useLike } from '../hooks/useLike';
+import { useSave } from '../hooks/useSave';
+import { useFollow } from '../hooks/useFollow';
+
+
+
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
+
 
 
 // Importeer de audio cache helper
@@ -74,6 +81,9 @@ export interface PostData {
   description: string;
   artistTags?: string[];
   genreTags: string[];
+  like_count: number;
+  save_count: number;
+  follower_count: number;
   timestamp: string;
   isLiked: boolean;
   isFollowed: boolean;
@@ -108,11 +118,48 @@ const PostComponent: React.FC<PostProps> = ({
 }) => {
   const { user } = useAuth();
   const currentUserId = user?.id;
+  const {
+    liked,
+    likeCount,
+    formatCount,
+    loading: likeLoading,
+    toggleLike,
+  } = useLike({
+    userId: currentUserId!,
+    postId: post.id,
+    receiverId: post.userId,
+    initialCount: post.like_count,  // ← geef ‘m hier door
+  });
+  const {
+    saved,
+    saveCount,
+    loading: saveLoading,
+    toggleSave,
+  } = useSave({
+    userId: currentUserId!,
+    postId: post.id,
+    initialCount: post.save_count,
+  });
+  const {
+    isFollowing,
+    followCount,
+    loading: followLoading,
+    toggleFollow,
+  } = useFollow({
+    followerId: currentUserId!,
+    followingId: post.userId,
+    initialCount: post.follower_count,  // Gebruik de initial follower count
+  });
+  
+  
+  
+  
   const [isPlaying, setIsPlaying] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [manualPaused, setManualPaused] = useState(false);
   const [showSeeMore, setShowSeeMore] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
+
 
   const toggleAnim = useRef(new Animated.Value(0)).current;
   const [artistExpanded, setArtistExpanded] = useState(false);
@@ -361,6 +408,15 @@ const PostComponent: React.FC<PostProps> = ({
     console.log("Post height:", height);
   };
 
+
+
+
+
+
+
+
+
+
   return (
     <View style={styles.fullScreen}>
       {/* verschuif de volledige media + blur 50 punten naar beneden */}
@@ -547,25 +603,57 @@ const PostComponent: React.FC<PostProps> = ({
             </TouchableOpacity>
           </View>
   
-          {/* acties-overlay bottom-right */}
+ 
+ 
+  {/* acties-overlay bottom-right */}
           {currentUserId && (
             <View style={styles.actionsOverlay}>
-              <TouchableOpacity style={styles.likeButton}>
-                <Like
-                  postId={post.id}
-                  userId={currentUserId}
-                  receiverId={post.userId}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton}>
-                <SaveButton postId={post.id} userId={currentUserId} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.followButton}>
-                <Follow
-                  followerId={currentUserId}
-                  followingId={post.userId}
-                />
-              </TouchableOpacity>
+  
+  
+  {/* ─── Like ─── */}
+<TouchableOpacity
+  style={styles.likeButton}
+  onPress={toggleLike}
+  disabled={likeLoading}
+>
+  <Like liked={liked} onPress={toggleLike} />
+
+    <Text style={styles.counterText}>{formatCount(likeCount)}</Text>
+  
+</TouchableOpacity>
+
+
+
+
+  <TouchableOpacity
+    style={styles.saveButton}
+    onPress={toggleSave}           // hook aanroepen
+    disabled={saveLoading}         // voorkom dubbelklikken
+  >
+    <SaveButton 
+      saved={saved}                // icoon-staat
+      onPress={toggleSave}         // callback voor animatie/feedback
+      postId={post.id}             // als je ‘m elders nodig hebt
+      userId={currentUserId}       // idem
+    />
+    
+    <Text style={styles.counterText}>{formatCount(saveCount)}</Text>
+  
+  </TouchableOpacity>
+
+
+
+
+    {/* Follow Button */}
+    <TouchableOpacity
+              style={styles.followButton}
+              onPress={toggleFollow}
+              disabled={followLoading}
+            >
+              <Follow followerId={currentUserId} followingId={post.userId  } onPress={toggleFollow}  />
+              <Text style={styles.counterText}>{formatCount(followCount)}</Text>
+            </TouchableOpacity>
+
             </View>
           )}
         </Pressable>
@@ -818,23 +906,30 @@ timeLabelRemaining: {
     position: "absolute",
     bottom: scale * 120,
     left: scale * 2,
-    right: scale * 10,
+    right: scale * 10,  // Zorg ervoor dat de tekst niet helemaal naar rechts uitstrekt
     backgroundColor: "rgba(0,0,0,0.0)",
     borderRadius: scale * 5,
     padding: scale * 10,
+    width: "80%",  // Zorg ervoor dat de breedte van de tekst niet te breed is
   },
   postTitle: {
     color: "white",
     fontSize: scale * 16,
     fontWeight: "bold",
     marginBottom: scale * 5,
+    maxWidth: "100%",  // Zorg ervoor dat de titel binnen de container past
+    textOverflow: "ellipsis",  // Voeg ellipsis toe voor te lange tekst
+    overflow: "hidden",  // Verberg de tekst die buiten de container valt
     
-   
   },
   postDescription: {
     color: "white",
     fontSize: scale * 14,
-  
+    maxWidth: "100%",  // Zorg ervoor dat de beschrijving niet buiten de container valt
+    textOverflow: "ellipsis",  // Voeg ellipsis toe voor te lange tekst
+    overflow: "hidden",  // Verberg de tekst die buiten de container valt
+   
+    marginBottom: scale * 10,  // Geef wat ruimte tussen de beschrijving en de knop
   },
   hiddenText: {
     position: "absolute",
@@ -857,11 +952,12 @@ timeLabelRemaining: {
   },
   actionsOverlay: {
     position: "absolute",
-    bottom: scale * 72,   // pas aan naar wens
-    left: scale * 280,
-    flexDirection: "row",
+    bottom: scale * 60,   // pas aan naar wens
+    left: scale * 330,
+    flexDirection: "column",
     alignItems: "center",
     zIndex: 2,
+    justifyContent: 'flex-start',  // Knoppen blijven links uitgelijnd
   },
   
   timestampContainer: {
@@ -872,15 +968,73 @@ timeLabelRemaining: {
   },
 
   likeButton: {
-    right: scale * 20
+    position: 'relative', // Hiermee zet je de knop op een vaste positie
+
+    flexDirection: "column", // Horizontale richting voor knop en teller
+    alignItems: "center", // Centreren van items
+    justifyContent: 'flex-start', // Zorgt ervoor dat alles naar rechts wordt uitgelijnd
+     // iOS shadow
+     shadowColor: "#000",
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.3,
+     shadowRadius: 3,
+ 
+     // Android elevation
+     elevation: 4,
 
   },
+  counterText: {
+    color: "white",
+    transform: [{ translateX: -2 }],  // Verschuif het icoon 5 eenheden naar links
+    fontSize: scale * 12,
+    fontWeight: "medium",
+    marginTop: scale * 5,
+    marginBottom: scale * 15,
+    marginLeft: scale * 3,
+    textAlign: "center",
+     // iOS shadow
+     shadowColor: "#000",
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.3,
+     shadowRadius: 3,
+ 
+     // Android elevation
+     elevation: 4,
+  },
+  
   saveButton: {
-    right: scale * 2,
+    position: 'relative', // Hiermee zet je de knop op een vaste positie
+  
+    flexDirection: "column", // Horizontale richting voor knop en teller
+    alignItems: "center", // Centreren van items
+    justifyContent: 'flex-start',  // Wijzig dit naar 'flex-start'
+     // iOS shadow
+     shadowColor: "#000",
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.3,
+     shadowRadius: 3,
+ 
+     // Android elevation
+     elevation: 4,
+    
 
   },
   followButton: {
-  left: scale * 15,
+  position: 'relative', // Hiermee zet je de knop op een vaste positie
+
+  flexDirection: "column", // Horizontale richting voor knop en teller
+  alignItems: "center", // Centreren van items
+  justifyContent: 'flex-start',  // Wijzig dit naar 'flex-start'
+  transform: [{ translateX: -3 }],  // Verschuif het icoon 5 eenheden naar links
+   // iOS shadow
+   shadowColor: "#000",
+   shadowOffset: { width: 0, height: 2 },
+   shadowOpacity: 0.3,
+   shadowRadius: 3,
+
+   // Android elevation
+   elevation: 4,
+  
 
   },
   moreOptionsButton: {

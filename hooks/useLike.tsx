@@ -1,89 +1,77 @@
-// useLike.tsx
+// hooks/useLike.tsx
+
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
 export interface UseLikeProps {
   userId: string;
   postId: string;
-  receiverId: string; // Nieuwe property: de eigenaar van de post
+  receiverId: string;
+  initialCount: number;        // ❗️ zorg dat dit erin staat
 }
 
-export function useLike({ userId, postId, receiverId }: UseLikeProps) {
-  const [liked, setLiked] = useState<boolean>(false);
-  const [likeCount, setLikeCount] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+export function useLike({
+  userId,
+  postId,
+  receiverId,
+  initialCount,               // ❗️ en hier destructuren
+}: UseLikeProps) {
+  const [liked, setLiked]         = useState<boolean>(false);
+  const [likeCount, setLikeCount] = useState<number>(initialCount); // start met initialCount
+  const [loading, setLoading]     = useState<boolean>(true);
+  const [error, setError]         = useState<string | null>(null);
 
-  // Haal de huidige like-status en het aantal likes op
+  // Alleen de like-boolean ophalen, niet de count
   useEffect(() => {
-    async function fetchLikeData() {
+    async function fetchLikeStatus() {
       setLoading(true);
       setError(null);
-      
-      // 1. Tel het aantal likes voor de post
-      const { count, error: countError } = await supabase
-        .from('likes')
-        .select('id', { count: 'exact', head: true })
-        .eq('post_id', postId);
-      
-      if (countError) {
-        setError(countError.message);
-      } else {
-        setLikeCount(count || 0);
+      try {
+        const { data, error: likeErr } = await supabase
+          .from('likes')
+          .select('id')
+          .eq('post_id', postId)
+          .eq('user_id', userId)
+          .single();
+        setLiked(!likeErr && !!data);
+      } catch (e: any) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
       }
-      
-      // 2. Check of de huidige gebruiker de post al geliked heeft
-      const { data, error: likeError } = await supabase
-        .from('likes')
-        .select('*')
-        .eq('post_id', postId)
-        .eq('user_id', userId)
-        .single();
-      
-      if (!likeError && data) {
-        setLiked(true);
-      } else {
-        setLiked(false);
-      }
-      setLoading(false);
     }
-    
     if (userId && postId) {
-      fetchLikeData();
+      fetchLikeStatus();
     }
   }, [userId, postId]);
 
-  // Functie om de like-status te toggelen
+  // De RPC toggle
   async function toggleLike() {
     setError(null);
-    if (liked) {
-      // Like verwijderen: unlike
-      const { error } = await supabase
-        .from('likes')
-        .delete()
-        .eq('post_id', postId)
-        .eq('user_id', userId);
-      
-      if (error) {
-        setError(error.message);
-      } else {
-        setLiked(false);
-        setLikeCount(prev => prev - 1);
-      }
-    } else {
-      // Like toevoegen: like (met receiver_id)
-      const { error } = await supabase
-        .from('likes')
-        .insert([{ user_id: userId, post_id: postId, receiver_id: receiverId }]);
-      
-      if (error) {
-        setError(error.message);
-      } else {
-        setLiked(true);
-        setLikeCount(prev => prev + 1);
-      }
+    setLoading(true);
+    const { data, error: rpcErr } = await supabase.rpc('toggle_like', {
+      p_post_id: postId,
+      p_user_id: userId,
+    });
+    setLoading(false);
+    if (rpcErr) {
+      setError(rpcErr.message);
+    } else if (data?.length) {
+      const newCount = data[0].new_like_count;
+      setLikeCount(newCount);
+      setLiked(prev => !prev);
     }
   }
-  
-  return { liked, likeCount, loading, error, toggleLike };
+  // Functie om de like count te formatteren naar "K" notatie
+  const formatCount = (count: number) => {
+    if (count < 1000) {
+      return count.toString(); // Geen verandering nodig voor counts minder dan 1000
+    } else if (count < 10000) {
+      return (count / 1000).toFixed(1) + 'K'; // Bijv. 7.5K voor counts tussen 1000 en 9999
+    } else {
+      return (count / 1000).toFixed(0) + 'K'; // Bijv. 10K voor counts vanaf 10000
+    }
+  };
+
+  return { liked, likeCount, loading, error, toggleLike, formatCount };
 }

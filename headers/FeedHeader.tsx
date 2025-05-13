@@ -25,31 +25,27 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({ onTabChange }) => {
 
   // Animated values
   const translateX = useRef(new Animated.Value(0)).current;
-  const bubbleWidth = useRef(new Animated.Value(0)).current;
+  const indicatorWidth = useRef(new Animated.Value(0)).current;
 
   // Layout refs
   const parentLayouts = useRef<{ x: number; width: number }[]>([]);
   const textLayouts = useRef<{ x: number; width: number }[]>([]);
 
   // Constants
-  const BUBBLE_PADDING = 15;
-  const BUBBLE_VERTICAL_OFFSET = 3;
-  const BUBBLE_HORIZONTAL_OFFSET = 0;
-  const BUBBLE_HEIGHT = 32;
-  const BUBBLE_RADIUS = BUBBLE_HEIGHT / 2;
+  const INDICATOR_HEIGHT = 3; // Dunne lijn
   const HEADER_CONTENT_HEIGHT = 48;
   const CONTAINER_HEIGHT = insets.top + HEADER_CONTENT_HEIGHT;
-  const BUBBLE_TOP = insets.top + (HEADER_CONTENT_HEIGHT - BUBBLE_HEIGHT) / 2 + BUBBLE_VERTICAL_OFFSET;
+  const INDICATOR_BOTTOM_OFFSET = 2; // Kleine marge voor de indicator onder de tabs
 
-  // Initialize bubble once layouts are measured
+  // Initialize indicator once layouts are measured
   useEffect(() => {
     if (!layoutsReady) return;
     const p = parentLayouts.current[activeIndex];
     const t = textLayouts.current[activeIndex];
-    const initX = p.x + t.x - BUBBLE_PADDING + BUBBLE_HORIZONTAL_OFFSET;
-    const initW = t.width + BUBBLE_PADDING * 2;
+    const initX = p.x + t.x;
+    const initW = t.width;
     translateX.setValue(initX);
-    bubbleWidth.setValue(initW);
+    indicatorWidth.setValue(initW);
   }, [layoutsReady]);
 
   const handleTabPress = (index: number) => {
@@ -59,8 +55,8 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({ onTabChange }) => {
     const p = parentLayouts.current[index];
     const t = textLayouts.current[index];
     if (p && t) {
-      const targetX = p.x + t.x - BUBBLE_PADDING + BUBBLE_HORIZONTAL_OFFSET;
-      const targetW = t.width + BUBBLE_PADDING * 2;
+      const targetX = p.x + t.x;
+      const targetW = t.width;
       Animated.parallel([
         Animated.spring(translateX, {
           toValue: targetX,
@@ -68,7 +64,7 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({ onTabChange }) => {
           tension: 40,
           useNativeDriver: false,
         }),
-        Animated.spring(bubbleWidth, {
+        Animated.spring(indicatorWidth, {
           toValue: targetW,
           friction: 5,
           tension: 80,
@@ -100,24 +96,19 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({ onTabChange }) => {
     <View
       style={[
         styles.container,
-        {
-          paddingTop: insets.top + 8,
-          height: CONTAINER_HEIGHT,
-          paddingHorizontal: TAB_WIDTH * 0.2,
-        },
+        { paddingTop: insets.top + 8, height: CONTAINER_HEIGHT },
       ]}
     >
-      {/* Bubble */}
+      {/* Indicator (was bubble) */}
       {layoutsReady && (
         <Animated.View
           style={[
-            styles.bubble,
+            styles.indicator,
             {
-              height: BUBBLE_HEIGHT,
-              borderRadius: BUBBLE_RADIUS,
-              top: BUBBLE_TOP,
+              height: INDICATOR_HEIGHT, // Dunne lijn
               transform: [{ translateX }],
-              width: bubbleWidth,
+              width: indicatorWidth,
+              bottom: INDICATOR_BOTTOM_OFFSET, // Zet de indicator onder de tabs
             },
           ]}
         />
@@ -127,7 +118,10 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({ onTabChange }) => {
       {tabs.map((tab, idx) => (
         <TouchableOpacity
           key={tab}
-          style={styles.tab}
+          style={[
+            styles.tab,
+            { width: TAB_WIDTH * 1 }, // Tabs dichter bij elkaar (70% van de originele breedte)
+          ]}
           onLayout={onParentLayout(idx)}
           activeOpacity={0.7}
           onPress={() => handleTabPress(idx)}
@@ -158,6 +152,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    margin: 4
+    
   },
   tabText: {
     color: '#FFF',
@@ -171,9 +167,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     zIndex: 1,
   },
-  bubble: {
+  indicator: {
     position: 'absolute',
-    backgroundColor: '#4800FF',
+    backgroundColor: 'white',
     zIndex: 0,
   },
 });

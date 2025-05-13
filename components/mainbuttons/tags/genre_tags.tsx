@@ -30,16 +30,16 @@ const styles = StyleSheet.create({
         justifyContent: "center", // Centreert de inhoud verticaal
         marginRight: 2,
         backgroundColor: "transparant",
-        paddingHorizontal: 5,
-        paddingVertical: 0,
-        borderRadius: 15,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+        borderRadius: 12,
         marginVertical: 4,
         borderWidth: 1,               // Dunne rand
         borderColor: "white",         // Witte rand
        
       },
       text: {
-        fontSize: 10,
+        fontSize: 11,
         color: "white",
         fontFamily: "inter",
         fontWeight: "bold",
