@@ -21,7 +21,7 @@ import FeedHeader from "../../headers/FeedHeader"; // Jouw nieuwe header compone
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get("window");
 // Één item = volledige device-hoogte
-const itemLength = windowHeight;
+const itemLength = 780;
 
 const FeedScreenContent: React.FC = () => {
   const {
@@ -106,8 +106,9 @@ const FeedScreenContent: React.FC = () => {
 
   const onMomentumScrollEnd = ({ nativeEvent }: any) => {
     const offsetY = nativeEvent.contentOffset.y;
+    console.log("Scroll offset:", offsetY);
     const index = Math.round(offsetY / itemLength);
-    flatListRef.current?.scrollToOffset({ offset: index * itemLength, animated: true });
+    console.log("Current index:", index);
   };
 
   // initial loading
@@ -146,45 +147,56 @@ const FeedScreenContent: React.FC = () => {
 
         {/* Feed */}
         <View style={[styles.tabContent, { display: activeTab === 1 ? "flex" : "none" }]}>
-          <FlatList
-            ref={flatListRef}
-            data={posts}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item, index }) => {
-              const isWithinPreloadRange = Math.abs(index - activeIndex) <= 4;
-              return (
-                <PostComponent
-                  post={{ ...item, timestamp: item.timestamp.toString() }}
-                  isActive={activePostId === item.id}
-                  artistTags={artistTags}
-                  genreTags={genreTags}
-                  feedFocused={isFocused && activeTab === 1}
-                  withinPreloadRange={isWithinPreloadRange}
-                />
-              );
-            }}
-            decelerationRate="fast"
-            snapToAlignment="start"
-            showsVerticalScrollIndicator={false}
-            getItemLayout={(_, idx) => ({ length: itemLength, offset: itemLength * idx, index: idx })}
-            snapToInterval={itemLength}
-            pagingEnabled
-            disableIntervalMomentum
-            onViewableItemsChanged={onViewableItemsChanged}
-            viewabilityConfig={{ itemVisiblePercentThreshold: 70 }}
-            onEndReached={handleEndReached}
-            onEndReachedThreshold={0.1}
-            ListFooterComponent={
-              loadingMore ? (
-                <View style={styles.footer}>
-                  <ActivityIndicator size="small" color="white" />
-                  <Text style={{ color: "white", marginTop: 5 }}>Laden...</Text>
-                </View>
-              ) : null
-            }
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-            onMomentumScrollEnd={onMomentumScrollEnd}
-          />
+        <FlatList
+  ref={flatListRef}
+  data={posts}
+  keyExtractor={(item) => item.id}
+  renderItem={({ item, index }) => {
+    const isWithinPreloadRange = Math.abs(index - activeIndex) <= 4;
+    return (
+      <PostComponent
+        post={{
+          ...item,
+          timestamp: item.timestamp.toString(),
+          like_count: item.like_count,
+          save_count: item.save_count,
+          follower_count: item.follower_count,
+          isLiked: item.isLiked,
+          isSaved: item.isSaved,
+          isFollowed: item.isFollowed,
+        }}
+        isActive={activePostId === item.id}
+        artistTags={artistTags}
+        genreTags={genreTags}
+        feedFocused={isFocused && activeTab === 1}
+        withinPreloadRange={isWithinPreloadRange}
+      />
+    );
+  }}
+  decelerationRate={0.9935} // Adjusted for smoother scrolling
+  snapToAlignment="start"
+  showsVerticalScrollIndicator={false}
+  getItemLayout={(_, idx) => ({ length: itemLength, offset: itemLength * idx, index: idx })}
+  snapToInterval={itemLength}
+  pagingEnabled
+  disableIntervalMomentum
+  onViewableItemsChanged={onViewableItemsChanged}
+  viewabilityConfig={{ itemVisiblePercentThreshold: 70 }}
+  onEndReached={handleEndReached}
+  onEndReachedThreshold={0.1}
+  ListFooterComponent={
+    loadingMore ? (
+      <View style={styles.footer}>
+        <ActivityIndicator size="small" color="white" />
+        <Text style={{ color: "white", marginTop: 5 }}>Laden...</Text>
+      </View>
+    ) : null
+  }
+  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+  onMomentumScrollEnd={onMomentumScrollEnd} // Attach the handler here
+ 
+  
+/>
         </View>
 
         {/* Filters */}
@@ -204,10 +216,11 @@ const styles = StyleSheet.create({
   footer: { paddingVertical: 20, alignItems: "center" },
 
   // wrapper rondom alle tab-content
-  tabWrapper: { flex: 1 },
+  tabWrapper: { flex: 1}, 
 
   tabContent: {
     flex: 1,
+
   },
 
   placeholder: { flex: 1, justifyContent: "center", alignItems: "center" },

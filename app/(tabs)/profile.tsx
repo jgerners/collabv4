@@ -1,149 +1,185 @@
-// ProfileScreen.tsx
-import React, { useState, useEffect } from "react";
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
-  Image, 
-  ActivityIndicator 
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  ActivityIndicator,
+  Dimensions,
 } from "react-native";
 import { useAuth } from "../../context/authContext";
 import ProfilePic from "../../components/mainbuttons/profilepic";
+import { ProfileBanner } from "../../components/profile_banner";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../../routes";
 import { supabase } from "../../supabaseClient";
-import MediaModal from "../../components/demoModule"; // Pas de import aan op basis van je mappenstructuur
 import DemoModule from "../../components/demoModule";
+
+const BANNER_HEIGHT = 340;
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const TAB_COUNT = 3;
+const TABS = ['Demos', 'Releases', 'Contact'];
 
 export default function ProfileScreen() {
   const { profile } = useAuth();
   const [selectedTab, setSelectedTab] = useState("Demos");
   const [demos, setDemos] = useState<any[]>([]);
-  const [loadingDemos, setLoadingDemos] = useState<boolean>(false);
+  const [loadingDemos, setLoadingDemos] = useState(false);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
-  // State voor de modal
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedMedia, setSelectedMedia] = useState<any>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    const fetchDemos = async () => {
-      if (profile?.id) {
-        setLoadingDemos(true);
-        const { data, error } = await supabase
-          .from("demos")
-          .select("*")
-          .eq("profile_id", profile.id);
-        if (error) {
-          console.error("Error fetching demos:", error);
-        } else {
-          setDemos(data);
-        }
-        setLoadingDemos(false);
+    async function fetchDemos() {
+      if (!profile?.id) return;
+      setLoadingDemos(true);
+      const { data, error } = await supabase
+        .from("demos")
+        .select("*")
+        .eq("profile_id", profile.id);
+      if (error) {
+        console.error("Error fetching demos:", error);
+      } else {
+        setDemos(data || []);
       }
-    };
+      setLoadingDemos(false);
+    }
     fetchDemos();
   }, [profile]);
+
+  useEffect(() => {
+    const index = TABS.indexOf(selectedTab);
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ x: index * SCREEN_WIDTH, animated: true });
+    }
+  }, [selectedTab]);
+
+  const handleMomentumScrollEnd = (event: any) => {
+    const newIndex = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    const newTab = TABS[newIndex] || TABS[0];
+    setSelectedTab(newTab);
+  };
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<any>(null);
 
   const openModal = (mediaItem: any) => {
     setSelectedMedia(mediaItem);
     setModalVisible(true);
   };
-
   const closeModal = () => {
     setModalVisible(false);
     setSelectedMedia(null);
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.profileText}>
-          {profile?.username || "Gebruiker"}
-        </Text>
-      </View>
-
-      {/* Profielfoto */}
-      <TouchableOpacity style={styles.profileImageContainer}>
-        <ProfilePic
-          uri={profile?.profile_pic || "https://via.placeholder.com/100"}
-        />
-      </TouchableOpacity>
-
-      {/* Gebruikersinformatie */}
-      <Text style={styles.displayname}>
-        {profile?.display_name || "Geen display naam"}
-      </Text>
-      <Text style={styles.role}>{profile?.role || "Onbekende rol"}</Text>
-      <Text style={styles.bio}>{profile?.bio || "Geen bio beschikbaar"}</Text>
-
-      {/* Edit Profile knop */}
-      <TouchableOpacity
-        style={styles.editProfileButton}
-        onPress={() => navigation.navigate("EditProfile")}
-      >
-        <Text style={styles.editProfileText}>Edit Profile</Text>
-      </TouchableOpacity>
-
-      {/* Tabs */}
-      <View style={styles.tabs}>
-        {["Demos", "Releases", "Contact"].map((tab) => (
-          <TouchableOpacity key={tab} onPress={() => setSelectedTab(tab)}>
-            <Text style={[styles.tabText, selectedTab === tab && styles.activeTab]}>
-              {tab}
+    <View style={styles.root}>
+      <View style={styles.absoluteBannerWrapper} pointerEvents="box-none">
+        <ProfileBanner
+          uri={profile?.profile_banner}
+          height={BANNER_HEIGHT}
+          style={styles.absoluteBanner}
+        >
+          <Text style={styles.overlayUsername}>
+            {profile?.username || "Gebruiker"}
+          </Text>
+          <View style={styles.avatarContainer}>
+            <ProfilePic uri={profile?.profile_pic || ""} />
+          </View>
+          <View style={styles.nameContainer}>
+            <Text style={styles.displayname}>
+              {profile?.display_name || "Geen display naam"}
             </Text>
-          </TouchableOpacity>
-        ))}
+            <Text style={styles.role}>
+              {profile?.role || "Onbekende rol"}
+            </Text>
+          </View>
+        </ProfileBanner>
       </View>
 
-      {/* Grid met Demo’s / Releases */}
-      <View style={styles.grid}>
-        {selectedTab === "Demos" ? (
-          <>
-            {loadingDemos ? (
-              <ActivityIndicator size="small" color="#A020F0" />
-            ) : demos && demos.length > 0 ? (
-              demos.map((item, index) => (
-                <TouchableOpacity 
-                  key={index} 
-                  onPress={() => openModal(item)}
-                >
-                  <Image
-                    source={{ uri: item.thumbnail ? item.thumbnail : item.media_url }}
-                    style={styles.gridItem}
-                  />
-                </TouchableOpacity>
-              ))
-            ) : (
-              <Text style={styles.noMediaText}>No demos uploaded</Text>
-            )}
+      <View style={styles.tabsWrapper}>
+        <View style={styles.tabs}>
+          {TABS.map((tab) => (
             <TouchableOpacity
-              style={[styles.gridItem, styles.plusBubble]}
-              onPress={() => navigation.navigate("uploadProfileMedia")}
+              key={tab}
+              onPress={() => setSelectedTab(tab)}
+              style={styles.tabItem}
             >
-              <Text style={styles.plusText}>+</Text>
+              <Text
+                style={[
+                  styles.tabText,
+                  selectedTab === tab && styles.activeTabText,
+                ]}
+              >
+                {tab}
+              </Text>
             </TouchableOpacity>
-          </>
-        ) : selectedTab === "Releases" ? (
-          Array(6)
-            .fill(null)
-            .map((_, index) => (
-              <View key={index} style={styles.gridItem} />
-            ))
-        ) : (
-          <Text style={{ color: "gray" }}>Contact info...</Text>
-        )}
+          ))}
+        </View>
+        <View style={styles.tabTrack} />
+        <View
+          style={[
+            styles.tabIndicator,
+            { left: TABS.indexOf(selectedTab) * (SCREEN_WIDTH / TAB_COUNT) },
+          ]}
+        />
       </View>
 
-      {/* Gebruik het aparte MediaModal component */}
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        ref={scrollViewRef}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
+      >
+        <View style={styles.page}>
+          {loadingDemos ? (
+            <ActivityIndicator size="small" color="#A020F0" />
+          ) : demos.length > 0 ? (
+            demos.map((item, i) => (
+              <TouchableOpacity
+                key={i}
+                onPress={() => openModal(item)}
+                style={styles.gridItemWrapper}
+              >
+                <Image
+                  source={{ uri: item.thumbnail || item.media_url }}
+                  style={styles.gridItem}
+                />
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Text style={styles.noMediaText}>No demos uploaded</Text>
+          )}
+          <TouchableOpacity
+            style={[styles.gridItemWrapper, styles.plusBubble]}
+            onPress={() => navigation.navigate('uploadProfileMedia')}
+          >
+            <Text style={styles.plusText}>+</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.page}>
+          {Array(6)
+            .fill(null)
+            .map((_, i) => (
+              <View key={i} style={styles.gridItemWrapper}>
+                <View style={styles.gridItem} />
+              </View>
+            ))}
+        </View>
+        <View style={styles.page}>
+          <Text style={{ color: 'gray' }}>Contact info...</Text>
+        </View>
+      </ScrollView>
+
       {selectedMedia && (
-        <DemoModule 
-          visible={modalVisible} 
-          mediaItem={selectedMedia} 
-          onClose={closeModal} 
+        <DemoModule
+          visible={modalVisible}
+          mediaItem={selectedMedia}
+          onClose={closeModal}
         />
       )}
     </View>
@@ -151,97 +187,129 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: "black",
-    alignItems: "center",
-    paddingTop: 130,
+    backgroundColor: 'black',
   },
-  header: {
-    width: "90%",
-    marginBottom: 20,
-    alignItems: "center",
+  absoluteBannerWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
-  profileText: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "bold",
+  absoluteBanner: {
+    borderBottomLeftRadius: 50,
+    borderBottomRightRadius: 50,
+    overflow: 'hidden',
   },
-  profileImageContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: "#1E1E1E",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
+  overlayUsername: {
+    position: 'absolute',
+    top: BANNER_HEIGHT / 2 - 100,
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  avatarContainer: {
+    position: 'absolute',
+    top: BANNER_HEIGHT / 2,
+    left: 25,
+    width: 60,
+    height: 60,
+    borderRadius: 40,
+    overflow: 'hidden',
+  },
+  nameContainer: {
+    position: 'absolute',
+    top: BANNER_HEIGHT / 2 + 10 + 80,
+    left: 30,
+    alignItems: 'flex-start',
   },
   displayname: {
-    color: "white",
+    color: '#fff',
     fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   role: {
-    color: "gray",
+    color: '#ddd',
     fontSize: 16,
   },
-  bio: {
-    color: "gray",
-    fontSize: 14,
+
+  tabsWrapper: {
+    position: 'relative',
+    width: '100%',
+    marginTop: BANNER_HEIGHT + 140,
     marginBottom: 20,
-  },
-  editProfileButton: {
-    backgroundColor: "#A020F0",
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  editProfileText: {
-    color: "white",
-    fontWeight: "bold",
   },
   tabs: {
-    flexDirection: "row",
-    width: "80%",
-    justifyContent: "space-around",
-    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  tabItem: {
+    width: SCREEN_WIDTH / TAB_COUNT,
+    alignItems: 'center',
   },
   tabText: {
-    color: "gray",
+    color: 'gray',
     fontSize: 16,
-  },
-  activeTab: {
-    color: "#A020F0",
-    fontWeight: "bold",
-    textDecorationLine: "underline",
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    width: "80%",
-    justifyContent: "space-between",
-  },
-  gridItem: {
-    width: 80,
-    height: 80,
-    backgroundColor: "#1E1E1E",
-    borderRadius: 10,
     marginBottom: 10,
   },
+  activeTabText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+
+  tabTrack: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    width: SCREEN_WIDTH / TAB_COUNT,
+    height: 2,
+    backgroundColor: '#fff',
+  },
+
+  page: {
+    width: SCREEN_WIDTH,
+    padding: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  gridItemWrapper: {
+    width: 110,
+    height: 110,
+    marginBottom: 10,
+  },
+  gridItem: {
+    flex: 1,
+    borderRadius: 10,
+    backgroundColor: '#1E1E1E',
+  },
   noMediaText: {
-    color: "gray",
-    textAlign: "center",
-    width: "100%",
+    color: 'gray',
+    textAlign: 'center',
+    width: '100%',
   },
   plusBubble: {
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 2,
-    borderColor: "#A020F0",
+    borderColor: 'white',
+    borderRadius: 10,
   },
   plusText: {
-    color: "#A020F0",
+    color: 'white',
     fontSize: 30,
-    fontWeight: "bold",
+    fontWeight: 'bold',
   },
 });

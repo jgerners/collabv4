@@ -20,6 +20,8 @@ import { useProfiles } from "../../hooks/useProfiles";
 import { useLikes, Like } from "../../hooks/useLikes";
 import { useFollows, FollowNotification } from "../../hooks/useFollows";
 
+
+
 // 1. Definieer het type voor jouw navigator
 export type RootStackParamList = {
   ChatList: undefined;

@@ -54,6 +54,7 @@ if (
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get("window");
 const scale = windowWidth / 370;
+const postHeight = windowHeight * 0.9; // Full screen height
 
 export interface ArtistTagData {
   id: string;
@@ -463,7 +464,7 @@ const PostComponent: React.FC<PostProps> = ({
         style={StyleSheet.absoluteFill}
       />
   
-      <View style={styles.blackBottom} />
+
   
       {/* jouw bestaande post-container */}
       <View style={styles.postContainer} onLayout={handleLayout}>
@@ -725,27 +726,18 @@ const styles = StyleSheet.create({
   fullScreen: {
     position: "relative",
     width: windowWidth,
-    height: windowHeight,
+    height: 780,
     backgroundColor: "#000",
-    transform: [{ translateY: -85 }]
-  
-  },
-  blackBottom: {
-  position: "absolute",
-  top: scale * 800,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: "#121212",
-  zIndex: 0,  // onder je postContainer (die zIndex 2 heeft)
+    
   
   },
 
+
   postContainer: {
-    backgroundColor: "transparant",
+    backgroundColor: "transparent",
     borderRadius: scale * 15,
-    marginBottom: scale * 20,
-    height: scale * 620,
+    
+    height: "auto",
     width: scale * 365,
     alignSelf: "center",
     
@@ -823,6 +815,7 @@ const styles = StyleSheet.create({
   
       // Android elevation
       elevation: 4,
+      
   },
   genreTagsContainer: {
     flexDirection: "row",
@@ -842,10 +835,10 @@ const styles = StyleSheet.create({
     borderRadius: scale * 10,
     overflow: "hidden",
     backgroundColor: "#000",
-    height: scale * 570 ,
+    height: scale * 575 ,
     alignSelf: "center",
     position: "relative",
-    marginTop : scale * 85,
+    
 
 
    
@@ -1045,7 +1038,7 @@ timeLabelRemaining: {
   collabContainer: {
     position: "absolute",
     left: scale * 265,
-    top : scale * 672,
+    top : scale * 590,
     width: scale * 91
   },
   collabDisabled: {
