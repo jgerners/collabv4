@@ -4,6 +4,22 @@ import { useFollow } from "../../hooks/useFollow";
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
+
+
+import {
+  AntDesign,
+  Entypo,
+  Feather,
+  FontAwesome,
+  FontAwesome5,
+  Foundation,
+  Ionicons,
+  MaterialCommunityIcons,
+  Octicons,
+  SimpleLineIcons,
+} from '@expo/vector-icons'
+console.log(Object.keys(FontAwesome5.getRawGlyphMap()).filter(name => name.includes('follow')));
+
 interface FollowProps {
   followerId: string;
   followingId: string;
@@ -32,8 +48,8 @@ const Follow: React.FC<FollowProps> = ({ followerId, followingId, onPress }) => 
   return (
     <View style={styles.iconButton}>
       <TouchableOpacity onPress={handlePress} style={styles.iconButton} disabled={followLoading}>
-        <MaterialIcons
-          name={isFollowing ? "person-remove" : "person-add"}
+        <FontAwesome5 
+          name={isFollowing ? "user-check" : "user-circle"} // Gebruik FontAwesome5 voor de iconen
           size={22}
           color="white"
         />
@@ -46,6 +62,7 @@ const Follow: React.FC<FollowProps> = ({ followerId, followingId, onPress }) => 
 const styles = StyleSheet.create({
 
   iconButton: {
+    transform: [{ translateX: 1 }],
   },
 });
 

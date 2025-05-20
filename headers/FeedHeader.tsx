@@ -1,177 +1,160 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Dimensions,
-  StyleSheet,
-  LayoutChangeEvent,
-  Animated,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+"use client"
 
-const { width: screenWidth } = Dimensions.get('window');
-const TAB_COUNT = 3;
-const TAB_WIDTH = screenWidth / TAB_COUNT;
+import type React from "react"
+import { useState, useRef, useEffect } from "react"
+import { View, Text, TouchableOpacity, Dimensions, StyleSheet, ScrollView, Image } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
+import MaterialIcons from "react-native-vector-icons/MaterialIcons"
+import * as Font from "expo-font"
+
+const { width: screenWidth } = Dimensions.get("window")
 
 export interface FeedHeaderProps {
-  onTabChange?: (index: number) => void;
+  onFilterChange?: (filter: string) => void
+  onTabChange?: React.Dispatch<React.SetStateAction<number>>
 }
 
-const FeedHeader: React.FC<FeedHeaderProps> = ({ onTabChange }) => {
-  const insets = useSafeAreaInsets();
-  const [activeIndex, setActiveIndex] = useState(1);
-  const [layoutsReady, setLayoutsReady] = useState(false);
+const FeedHeader: React.FC<FeedHeaderProps> = ({ onFilterChange, onTabChange }) => {
+  const insets = useSafeAreaInsets()
+  const [activeFilter, setActiveFilter] = useState("For you")
+  const scrollViewRef = useRef<ScrollView>(null)
+  const [fontsLoaded, setFontsLoaded] = useState(false)
 
-  // Animated values
-  const translateX = useRef(new Animated.Value(0)).current;
-  const indicatorWidth = useRef(new Animated.Value(0)).current;
+  // Load fonts manually to have more control
+  useEffect(() => {
+    async function loadFonts() {
+      try {
+        await Font.loadAsync({
+          // Try to load the font with a more specific approach
+          Manrope: require("../assets/fonts/Manrope-VariableFont_wght.ttf"),
+        })
+        console.log("Font loaded successfully")
+        setFontsLoaded(true)
+      } catch (error) {
+        console.error("Error loading fonts:", error)
+        // Continue without custom fonts
+        setFontsLoaded(true)
+      }
+    }
 
-  // Layout refs
-  const parentLayouts = useRef<{ x: number; width: number }[]>([]);
-  const textLayouts = useRef<{ x: number; width: number }[]>([]);
+    loadFonts()
+  }, [])
 
   // Constants
-  const INDICATOR_HEIGHT = 3; // Dunne lijn
-  const HEADER_CONTENT_HEIGHT = 48;
-  const CONTAINER_HEIGHT = insets.top + HEADER_CONTENT_HEIGHT;
-  const INDICATOR_BOTTOM_OFFSET = 2; // Kleine marge voor de indicator onder de tabs
+  const HEADER_CONTENT_HEIGHT = 48
+  const CONTAINER_HEIGHT = insets.top + HEADER_CONTENT_HEIGHT
+  const LOGO_SIZE = 48
 
-  // Initialize indicator once layouts are measured
-  useEffect(() => {
-    if (!layoutsReady) return;
-    const p = parentLayouts.current[activeIndex];
-    const t = textLayouts.current[activeIndex];
-    const initX = p.x + t.x;
-    const initW = t.width;
-    translateX.setValue(initX);
-    indicatorWidth.setValue(initW);
-  }, [layoutsReady]);
-
-  const handleTabPress = (index: number) => {
-    setActiveIndex(index);
-    onTabChange?.(index);
-
-    const p = parentLayouts.current[index];
-    const t = textLayouts.current[index];
-    if (p && t) {
-      const targetX = p.x + t.x;
-      const targetW = t.width;
-      Animated.parallel([
-        Animated.spring(translateX, {
-          toValue: targetX,
-          friction: 7,
-          tension: 40,
-          useNativeDriver: false,
-        }),
-        Animated.spring(indicatorWidth, {
-          toValue: targetW,
-          friction: 5,
-          tension: 80,
-          useNativeDriver: false,
-        }),
-      ]).start();
+  const handleFilterPress = (filter: string) => {
+    setActiveFilter(filter)
+    if (onFilterChange) {
+      onFilterChange(filter)
     }
-  };
+  }
 
-  const onParentLayout = (index: number) => (e: LayoutChangeEvent) => {
-    parentLayouts.current[index] = e.nativeEvent.layout;
-    if (parentLayouts.current.filter(Boolean).length === TAB_COUNT &&
-        textLayouts.current.filter(Boolean).length === TAB_COUNT) {
-      setLayoutsReady(true);
-    }
-  };
-
-  const onTextLayout = (index: number) => (e: LayoutChangeEvent) => {
-    textLayouts.current[index] = e.nativeEvent.layout;
-    if (parentLayouts.current.filter(Boolean).length === TAB_COUNT &&
-        textLayouts.current.filter(Boolean).length === TAB_COUNT) {
-      setLayoutsReady(true);
-    }
-  };
-
-  const tabs = ['Friends', 'Feed', 'Filters'];
+  // Filter options based on the Figma design
+  const filters = ["For you", "Role", "Artist", "Style", "Instrument", "Genre", "Mood", "BPM"]
 
   return (
-    <View
-      style={[
-        styles.container,
-        { paddingTop: insets.top + 8, height: CONTAINER_HEIGHT },
-      ]}
-    >
-      {/* Indicator (was bubble) */}
-      {layoutsReady && (
-        <Animated.View
-          style={[
-            styles.indicator,
-            {
-              height: INDICATOR_HEIGHT, // Dunne lijn
-              transform: [{ translateX }],
-              width: indicatorWidth,
-              bottom: INDICATOR_BOTTOM_OFFSET, // Zet de indicator onder de tabs
-            },
-          ]}
-        />
-      )}
+    <View style={[styles.container, { paddingTop: insets.top + 8, height: CONTAINER_HEIGHT }]}>
+      <View style={styles.headerContent}>
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <Image source={require("../assets/collab_logo.png")} style={styles.logo} resizeMode="contain" />
+        </View>
 
-      {/* Tabs */}
-      {tabs.map((tab, idx) => (
-        <TouchableOpacity
-          key={tab}
-          style={[
-            styles.tab,
-            { width: TAB_WIDTH * 1 }, // Tabs dichter bij elkaar (70% van de originele breedte)
-          ]}
-          onLayout={onParentLayout(idx)}
-          activeOpacity={0.7}
-          onPress={() => handleTabPress(idx)}
+        {/* Horizontally scrollable filters */}
+        <ScrollView
+          ref={scrollViewRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filtersContainer}
         >
-          <Text
-            onLayout={onTextLayout(idx)}
-            style={
-              idx === activeIndex
-                ? styles.activeTabText
-                : styles.tabText
-            }
-          >
-            {tab}
-          </Text>
-        </TouchableOpacity>
-      ))}
+          {filters.map((filter, index) => (
+            <TouchableOpacity
+              key={filter}
+              style={[styles.filterButton, activeFilter === filter && styles.activeFilterButton]}
+              activeOpacity={0.7}
+              onPress={() => handleFilterPress(filter)}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  fontsLoaded && styles.customFont,
+                  activeFilter === filter && styles.activeFilterText,
+                ]}
+              >
+                {filter}
+              </Text>
+              <MaterialIcons
+                name="keyboard-arrow-down"
+                size={16}
+                color={activeFilter === filter ? "#FFFFFF" : "#AAAAAA"}
+                style={styles.chevronIcon}
+              />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
     </View>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'relative',
+    position: "relative",
+    backgroundColor: "#000000",
+    paddingHorizontal: 8,
+    transform: [{ translateY: -64 }],
   },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: 4
-    
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
   },
-  tabText: {
-    color: '#FFF',
+  logoContainer: {
+    marginRight: 8,
+    zIndex: 2,
+    height: 150,
+    width: 150,
+    transform: [{ translateX: -10 }],
+  },
+  logo: {
+    height: 150,
+    width: 150,
+  },
+  filtersContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingRight: 20, // Extra padding at the end for better scrolling
+    transform: [{ translateY: 2 }],
+  },
+  filterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginRight: 12,
+    borderRadius: 4,
+  },
+  activeFilterButton: {
+    // No background color change as per design
+  },
+  filterText: {
+    color: "#AAAAAA",
     fontSize: 16,
-    fontWeight: '500',
-    zIndex: 1,
   },
-  activeTabText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-    zIndex: 1,
+  customFont: {
+    fontFamily: "manrope",
+    fontWeight: "regular", // Use a specific weight if needed
   },
-  indicator: {
-    position: 'absolute',
-    backgroundColor: 'white',
-    zIndex: 0,
+  activeFilterText: {
+    color: "#FFFFFF",
+    fontWeight: "700", // Use font weight instead of a different font family
   },
-});
+  chevronIcon: {
+    marginLeft: 4,
+  },
+})
 
-export default FeedHeader;
+export default FeedHeader

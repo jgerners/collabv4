@@ -126,7 +126,7 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
         onLayout={startAnimation}
         start={{ x: animatedStartX, y: 0 }}
         end={{ x: 1, y: 0 }}
-        colors={["#4800FF", "#3D00D9"]}
+        colors={["transparant", "transparant"]}
       >
         <Text style={styles.collabText}>
           {status === "pending" ? "Request Sent" : "COLLAB!"}
@@ -142,10 +142,14 @@ const styles = StyleSheet.create({
   },
   collabButton: {
     paddingVertical: 3,
+    paddingHorizontal: 20,
     borderRadius: 12,
     height: 28,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "blue",
 
     
    

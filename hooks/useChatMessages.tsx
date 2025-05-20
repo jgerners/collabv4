@@ -15,17 +15,17 @@ export type NewChatMessage = {
   message: string;
 };
 
-const SOCKET_SERVER_URL = "http://192.168.178.94:3000"; // Pas dit aan
+const SOCKET_SERVER_URL = "http://192.168.178.143:3000"; // Your socket server URL
 
 export const useChatMessages = (chatId: string) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Bewaar de socket referentie
+  // Keep socket reference
   const socketRef = useRef<any>(null);
 
-  // Initiële data-fetch van de chatgeschiedenis
+  // Initial data fetch of chat history
   const fetchMessages = async () => {
     console.log("[useChatMessages] Fetching messages for chatId:", chatId);
     const { data, error } = await supabase
@@ -48,7 +48,9 @@ export const useChatMessages = (chatId: string) => {
     fetchMessages();
   }, [chatId]);
 
-  // Socket.io initialisatie, join de room en luister naar realtime updates
+  
+
+  // Socket.io initialization, join the room and listen for real-time updates
   useEffect(() => {
     const socket = io(SOCKET_SERVER_URL, { transports: ["websocket"] });
     socketRef.current = socket;
@@ -59,7 +61,7 @@ export const useChatMessages = (chatId: string) => {
     });
 
     socket.on("chatMessage", (data: ChatMessage) => {
-      console.log("[useChatMessages] Socket ontvangt bericht:", data);
+      console.log("[useChatMessages] Socket received message:", data);
       if (data.chat_id === chatId) {
         setMessages((prev) => {
           if (!prev.find((msg) => msg.id === data.id)) {
@@ -82,11 +84,11 @@ export const useChatMessages = (chatId: string) => {
     };
   }, [chatId]);
 
-  // Verstuur bericht: insert naar Supabase en daarna emit via socket
+  // Send message: insert to Supabase and then emit via socket
   const sendMessage = async (newMessage: NewChatMessage) => {
     console.log("[useChatMessages] Sending message:", newMessage);
     
-    // Insert het bericht naar de database
+    // Insert the message to the database
     const { data, error } = await supabase
       .from("chat_messages")
       .insert([
@@ -107,7 +109,7 @@ export const useChatMessages = (chatId: string) => {
     console.log("[useChatMessages] Message sent successfully, response:", data);
     const insertedMessage = (data as ChatMessage[])[0];
 
-    // Emit het volledige bericht via socket
+    // Emit the full message via socket
     if (socketRef.current) {
       socketRef.current.emit("chatMessage", insertedMessage);
       console.log("[useChatMessages] Emitted chatMessage via socket:", insertedMessage);
@@ -129,7 +131,7 @@ export const useChatMessages = (chatId: string) => {
     return { data };
   };
 
-  return { messages, loading, error, refetch: fetchMessages, sendMessage };
+  return { messages, setMessages, loading, error, refetch: fetchMessages, sendMessage };
 };
 
 export default useChatMessages;

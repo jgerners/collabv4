@@ -1,4 +1,7 @@
-import React, { useRef, useState, useEffect } from "react";
+"use client"
+
+import type React from "react"
+import { useRef, useState, useEffect } from "react"
 import {
   Animated,
   View,
@@ -11,103 +14,99 @@ import {
   UIManager,
   Platform,
   LayoutAnimation,
-  ActivityIndicator,
-} from "react-native";
-import { Video, ResizeMode, Audio } from "expo-av";
-import { useAuth } from "../context/authContext";
-import Slider from "@react-native-community/slider";
-import { setCurrentPlayingMedia, stopCurrentMedia } from "../PlaybackManager";
+  ScrollView,
+} from "react-native"
+import { Video, ResizeMode, Audio } from "expo-av"
+import { useAuth } from "../context/authContext"
+import Slider from "@react-native-community/slider"
+import { setCurrentPlayingMedia } from "../PlaybackManager"
+import { Svg, Path } from "react-native-svg" // Make sure to import these
 
-import { useLike } from '../hooks/useLike';
-import { useSave } from '../hooks/useSave';
-import { useFollow } from '../hooks/useFollow';
+import { useLike } from "../hooks/useLike"
+import { useSave } from "../hooks/useSave"
+import { useFollow } from "../hooks/useFollow"
+import { useUserProfile } from "../hooks/useUserProfile"
 
+import { useFonts } from "expo-font"
 
-
-import { BlurView } from "expo-blur";
-import { LinearGradient } from "expo-linear-gradient";
-
-
+import { BlurView } from "expo-blur"
+import { LinearGradient } from "expo-linear-gradient"
 
 // Importeer de audio cache helper
-import { getCachedAudio, setCachedAudio } from "../helpers/audioCache";
+import { getCachedAudio, setCachedAudio } from "../helpers/audioCache"
 
-import ProfileLink from "./profileLink";
-import Like from "./mainbuttons/like";
-import Follow from "./mainbuttons/follow";
-import MoreOptions from "./mainbuttons/moreOptions";
-import PlayPause from "./mainbuttons/play_pause";
-import Collab from "./mainbuttons/collab";
-import ArtistTag from "./mainbuttons/tags/artist_tags";
-import GenreTag from "./mainbuttons/tags/genre_tags";
-import ReplayButton from "./mainbuttons/replay";
-import SaveButton from "./mainbuttons/save";
-import Timestamp from "./mainbuttons/timestamp";
+import ProfileLink from "./profileLink"
+import Like from "./mainbuttons/like"
+import Follow from "./mainbuttons/follow"
+import MoreOptions from "./mainbuttons/moreOptions"
+import Collab from "./mainbuttons/collab"
+import ArtistTag from "./mainbuttons/tags/artist_tags"
+import GenreTag from "./mainbuttons/tags/genre_tags"
+import ReplayButton from "./mainbuttons/replay"
+import SaveButton from "./mainbuttons/save"
+import Timestamp from "./mainbuttons/timestamp"
 
 // Activeer LayoutAnimation op Android
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true)
 }
 
-const { width: windowWidth, height: windowHeight } = Dimensions.get("window");
-const scale = windowWidth / 370;
-const postHeight = windowHeight * 0.9; // Full screen height
+const { width: windowWidth, height: windowHeight } = Dimensions.get("window")
+const scale = windowWidth / 370
+const postHeight = windowHeight * 0.9 // Full screen height
 
 export interface ArtistTagData {
-  id: string;
-  name: string;
-  image: string;
+  id: string
+  name: string
+  image: string
 }
 
 export interface GenreTagData {
-  id: string;
-  name: string;
+  id: string
+  name: string
 }
 
 export interface PostData {
-  id: string;
-  userId: string;
-  profileImage: string;
-  username: string;
-  display_name: string;
-  role: string;
-  media: string | number;
-  mediaUrl?: string | number;
-  mediaType?: "image" | "video" | "photo";
-  audio?: string | number;
-  title: string;
-  description: string;
-  artistTags?: string[];
-  genreTags: string[];
-  like_count: number;
-  save_count: number;
-  follower_count: number;
-  timestamp: string;
-  isLiked: boolean;
-  isFollowed: boolean;
-  isSaved: boolean;
-  isPlaying?: boolean;
+  id: string
+  userId: string
+  profileImage: string
+  username: string
+  display_name: string
+  role: string
+  media: string | number
+  mediaUrl?: string | number
+  mediaType?: "image" | "video" | "photo"
+  audio?: string | number
+  title: string
+  description: string
+  artistTags?: string[]
+  genreTags: string[]
+  like_count: number
+  save_count: number
+  follower_count: number
+  timestamp: string
+  isLiked: boolean
+  isFollowed: boolean
+  isSaved: boolean
+  isPlaying?: boolean
 }
 
 interface PostProps {
-  post: PostData;
-  artistTags: ArtistTagData[];
-  genreTags: GenreTagData[];
-  isActive: boolean; // Geeft aan of de post automatisch moet afspelen
-  feedFocused: boolean; // Geeft aan of de feed in focus is
-  withinPreloadRange: boolean; // Indicator, maar niet meer actief gebruikt
+  post: PostData
+  artistTags: ArtistTagData[]
+  genreTags: GenreTagData[]
+  isActive: boolean // Geeft aan of de post automatisch moet afspelen
+  feedFocused: boolean // Geeft aan of de feed in focus is
+  withinPreloadRange: boolean // Indicator, maar niet meer actief gebruikt
 }
 
 // voor de timers bij de seekbar
 const formatTime = (ms: number) => {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-};
+  const totalSeconds = Math.floor(ms / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`
+}
 
 const PostComponent: React.FC<PostProps> = ({
   post,
@@ -117,8 +116,8 @@ const PostComponent: React.FC<PostProps> = ({
   feedFocused,
   withinPreloadRange,
 }) => {
-  const { user } = useAuth();
-  const currentUserId = user?.id;
+  const { user } = useAuth()
+  const currentUserId = user?.id
   const {
     liked,
     likeCount,
@@ -129,8 +128,8 @@ const PostComponent: React.FC<PostProps> = ({
     userId: currentUserId!,
     postId: post.id,
     receiverId: post.userId,
-    initialCount: post.like_count,  // ← geef ‘m hier door
-  });
+    initialCount: post.like_count, // ← geef 'm hier door
+  })
   const {
     saved,
     saveCount,
@@ -140,7 +139,7 @@ const PostComponent: React.FC<PostProps> = ({
     userId: currentUserId!,
     postId: post.id,
     initialCount: post.save_count,
-  });
+  })
   const {
     isFollowing,
     followCount,
@@ -149,24 +148,59 @@ const PostComponent: React.FC<PostProps> = ({
   } = useFollow({
     followerId: currentUserId!,
     followingId: post.userId,
-    initialCount: post.follower_count,  // Gebruik de initial follower count
-  });
-  
-  
-  
-  
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
-  const [manualPaused, setManualPaused] = useState(false);
-  const [showSeeMore, setShowSeeMore] = useState(false);
-  const [audioLoading, setAudioLoading] = useState(false);
+    initialCount: post.follower_count, // Gebruik de initial follower count
+  })
 
+  const { profile, loading: profileLoading, error: profileError } = useUserProfile(post.userId)
 
-  const toggleAnim = useRef(new Animated.Value(0)).current;
-  const [artistExpanded, setArtistExpanded] = useState(false);
+   const [fontsLoaded] = useFonts({
+      "Manrope": require("../assets/fonts/Manrope-VariableFont_wght.ttf")
+    })
+
+  // Slide functionality
+  const [activeSlide, setActiveSlide] = useState(0)
+  const totalSlides = 3 // Total number of slides
+  const scrollViewRef = useRef<ScrollView>(null)
+  const scrollX = useRef(new Animated.Value(0)).current
+
+  // Bottom section scroll
+  const bottomScrollRef = useRef<ScrollView>(null)
+  const [bottomActiveSlide, setBottomActiveSlide] = useState(0)
+  const bottomScrollX = useRef(new Animated.Value(0)).current
+
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false)
+  const [manualPaused, setManualPaused] = useState(false)
+  const [showSeeMore, setShowSeeMore] = useState(false)
+  const [audioLoading, setAudioLoading] = useState(false)
+
+  const toggleAnim = useRef(new Animated.Value(0)).current
+  const [artistExpanded, setArtistExpanded] = useState(false)
 
   // Deze ref zorgt ervoor dat auto-play slechts één keer per activatie gebeurt
-  const hasAutoPlayedRef = useRef(false);
+  const hasAutoPlayedRef = useRef(false)
+
+  // Handle dot indicator press
+  const handleDotPress = (index: number) => {
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ x: index * windowWidth, animated: true })
+      setActiveSlide(index)
+    }
+  }
+
+  // Handle scroll end to update active slide
+  const handleScrollEnd = (event: any) => {
+    const contentOffsetX = event.nativeEvent.contentOffset.x
+    const newIndex = Math.round(contentOffsetX / windowWidth)
+    setActiveSlide(newIndex)
+  }
+
+  // Handle bottom section scroll end
+  const handleBottomScrollEnd = (event: any) => {
+    const contentOffsetX = event.nativeEvent.contentOffset.x
+    const newIndex = Math.round(contentOffsetX / windowWidth)
+    setBottomActiveSlide(newIndex)
+  }
 
   const expandArtistTags = () => {
     if (!artistExpanded) {
@@ -174,10 +208,10 @@ const PostComponent: React.FC<PostProps> = ({
         toValue: 1,
         duration: 300,
         useNativeDriver: false,
-      }).start();
-      setArtistExpanded(true);
+      }).start()
+      setArtistExpanded(true)
     }
-  };
+  }
 
   const collapseArtistTags = () => {
     if (artistExpanded) {
@@ -185,238 +219,215 @@ const PostComponent: React.FC<PostProps> = ({
         toValue: 0,
         duration: 300,
         useNativeDriver: false,
-      }).start();
-      setArtistExpanded(false);
+      }).start()
+      setArtistExpanded(false)
     }
-  };
+  }
 
-  const videoRef = useRef<Video | null>(null);
-  const audioRef = useRef<Audio.Sound | null>(null);
+  const videoRef = useRef<Video | null>(null)
+  const audioRef = useRef<Audio.Sound | null>(null)
 
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0)
+  const [currentTime, setCurrentTime] = useState(0)
 
   const awaitOrIgnore = async (fn: () => Promise<any>) => {
     try {
-      await fn();
+      await fn()
     } catch (error) {
       // Eventuele logging
     }
-  };
+  }
 
   const updatePlaybackStatus = (status: any) => {
     if (status.isLoaded) {
-      setCurrentTime(status.positionMillis);
-      setDuration(status.durationMillis);
+      setCurrentTime(status.positionMillis)
+      setDuration(status.durationMillis)
     }
-  };
+  }
 
   const toggleDescription = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setDescriptionExpanded(!descriptionExpanded);
-  };
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
+    setDescriptionExpanded(!descriptionExpanded)
+  }
 
-  const retryPlayAudio = async (
-    sound: Audio.Sound,
-    retries: number = 3
-  ): Promise<void> => {
+  const retryPlayAudio = async (sound: Audio.Sound, retries = 3): Promise<void> => {
     for (let i = 0; i < retries; i++) {
       try {
-        const status = await sound.getStatusAsync();
+        const status = await sound.getStatusAsync()
         if (status.isLoaded) {
-          await sound.playAsync();
-          return;
+          await sound.playAsync()
+          return
         }
       } catch (error) {}
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 300))
     }
-  };
+  }
 
   // Aangepaste playAudio-functie met optionele parameter "reset"
   // reset = true: positie naar 0 zetten (auto-play), reset = false: huidige positie behouden
-  const playAudio = async (reset: boolean = true) => {
-    setAudioLoading(true);
+  const playAudio = async (reset = true) => {
+    setAudioLoading(true)
     try {
-      let sound = getCachedAudio(post.id);
-      const audioUri =
-        typeof post.audio === "string" ? post.audio : post.audio!.toString();
+      let sound = getCachedAudio(post.id)
+      const audioUri = typeof post.audio === "string" ? post.audio : post.audio!.toString()
       if (sound) {
-        const status = await sound.getStatusAsync();
+        const status = await sound.getStatusAsync()
         if (!status.isLoaded) {
-          const { sound: newSound } = await Audio.Sound.createAsync(
-            { uri: audioUri },
-            { shouldPlay: true }
-          );
-          sound = newSound;
-          setCachedAudio(post.id, sound);
-          sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+          const { sound: newSound } = await Audio.Sound.createAsync({ uri: audioUri }, { shouldPlay: true })
+          sound = newSound
+          setCachedAudio(post.id, sound)
+          sound.setOnPlaybackStatusUpdate(updatePlaybackStatus)
         } else {
           if (reset) {
-            await sound.setPositionAsync(0);
+            await sound.setPositionAsync(0)
           }
-          sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
-          await sound.playAsync();
+          sound.setOnPlaybackStatusUpdate(updatePlaybackStatus)
+          await sound.playAsync()
         }
       } else {
-        const { sound: newSound } = await Audio.Sound.createAsync(
-          { uri: audioUri },
-          { shouldPlay: true }
-        );
-        sound = newSound;
-        setCachedAudio(post.id, sound);
-        sound.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+        const { sound: newSound } = await Audio.Sound.createAsync({ uri: audioUri }, { shouldPlay: true })
+        sound = newSound
+        setCachedAudio(post.id, sound)
+        sound.setOnPlaybackStatusUpdate(updatePlaybackStatus)
       }
-      audioRef.current = sound;
-      setIsPlaying(true);
+      audioRef.current = sound
+      setIsPlaying(true)
     } catch (error) {
-      console.error("Fout bij het laden van audio:", error);
+      console.error("Fout bij het laden van audio:", error)
     }
-    setAudioLoading(false);
-  };
+    setAudioLoading(false)
+  }
 
   useEffect(() => {
     if (post.mediaType === "video" && videoRef.current) {
-      videoRef.current.setOnPlaybackStatusUpdate(updatePlaybackStatus);
+      videoRef.current.setOnPlaybackStatusUpdate(updatePlaybackStatus)
     }
-  }, [post.mediaType]);
+  }, [post.mediaType])
 
   // Auto-play effect
   useEffect(() => {
     const managePlayback = async () => {
       if (isActive && feedFocused) {
         if (post.mediaType === "video" && videoRef.current) {
-          await setCurrentPlayingMedia(videoRef.current);
-          awaitOrIgnore(() => videoRef.current!.playAsync());
-          setIsPlaying(true);
+          await setCurrentPlayingMedia(videoRef.current)
+          awaitOrIgnore(() => videoRef.current!.playAsync())
+          setIsPlaying(true)
+          setManualPaused(false) // Reset manual pause when auto-playing
         } else if (post.mediaType === "photo" && post.audio) {
-          let sound = getCachedAudio(post.id);
+          const sound = getCachedAudio(post.id)
           if (sound) {
-            const status = await sound.getStatusAsync();
-            const shouldReset = status.isLoaded
-              ? status.positionMillis === 0
-              : true;
-            await playAudio(shouldReset);
+            const status = await sound.getStatusAsync()
+            const shouldReset = status.isLoaded ? status.positionMillis === 0 : true
+            await playAudio(shouldReset)
           } else {
-            await playAudio(true);
+            await playAudio(true)
           }
+          setManualPaused(false) // Reset manual pause when auto-playing
         }
-        hasAutoPlayedRef.current = true;
+        hasAutoPlayedRef.current = true
       } else {
         if (feedFocused) {
           if (post.mediaType === "video" && videoRef.current) {
-            awaitOrIgnore(() => videoRef.current!.pauseAsync());
-            awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
-            setIsPlaying(false);
-          } else if (
-            post.mediaType === "photo" &&
-            post.audio &&
-            audioRef.current
-          ) {
-            awaitOrIgnore(() => audioRef.current!.pauseAsync());
-            awaitOrIgnore(() => audioRef.current!.setPositionAsync(0));
-            setIsPlaying(false);
+            awaitOrIgnore(() => videoRef.current!.pauseAsync())
+            awaitOrIgnore(() => videoRef.current!.setPositionAsync(0))
+            setIsPlaying(false)
+            setManualPaused(false) // Not manually paused when scrolling away
+          } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+            awaitOrIgnore(() => audioRef.current!.pauseAsync())
+            awaitOrIgnore(() => audioRef.current!.setPositionAsync(0))
+            setIsPlaying(false)
+            setManualPaused(false) // Not manually paused when scrolling away
           }
         } else {
           if (post.mediaType === "video" && videoRef.current) {
-            awaitOrIgnore(() => videoRef.current!.pauseAsync());
-            setIsPlaying(false);
-          } else if (
-            post.mediaType === "photo" &&
-            post.audio &&
-            audioRef.current
-          ) {
-            awaitOrIgnore(() => audioRef.current!.pauseAsync());
-            setIsPlaying(false);
+            awaitOrIgnore(() => videoRef.current!.pauseAsync())
+            setIsPlaying(false)
+            setManualPaused(false) // Not manually paused when scrolling away
+          } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
+            awaitOrIgnore(() => audioRef.current!.pauseAsync())
+            setIsPlaying(false)
+            setManualPaused(false) // Not manually paused when scrolling away
           }
         }
-        hasAutoPlayedRef.current = false;
+        hasAutoPlayedRef.current = false
       }
-    };
+    }
 
-    managePlayback();
-  }, [isActive, feedFocused]);
+    managePlayback()
+  }, [isActive, feedFocused])
 
   // Handmatige play/pause
   const handlePlayPause = async () => {
     if (post.mediaType === "video" && videoRef.current) {
       if (isPlaying) {
-        await videoRef.current.pauseAsync();
-        setIsPlaying(false);
-        setManualPaused(true);
+        await videoRef.current.pauseAsync()
+        setIsPlaying(false)
+        setManualPaused(true) // Set to true when manually paused
       } else {
-        await videoRef.current.playAsync();
-        setIsPlaying(true);
-        setManualPaused(false);
+        await videoRef.current.playAsync()
+        setIsPlaying(true)
+        setManualPaused(false)
       }
     } else if (post.mediaType === "photo" && post.audio) {
       if (audioRef.current) {
         if (isPlaying) {
-          await audioRef.current.pauseAsync();
-          setIsPlaying(false);
-          setManualPaused(true);
+          await audioRef.current.pauseAsync()
+          setIsPlaying(false)
+          setManualPaused(true) // Set to true when manually paused
         } else {
-          await audioRef.current.playAsync();
-          setIsPlaying(true);
-          setManualPaused(false);
+          await audioRef.current.playAsync()
+          setIsPlaying(true)
+          setManualPaused(false)
         }
       }
     }
-  };
+  }
 
   // Seekbar-handler
   const handleSlidingComplete = async (value: number) => {
-    const newPosition = value * duration;
+    const newPosition = value * duration
     if (post.mediaType === "video" && videoRef.current) {
-      await videoRef.current.setPositionAsync(newPosition);
+      await videoRef.current.setPositionAsync(newPosition)
     } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
-      await audioRef.current.setPositionAsync(newPosition);
-      const status = await audioRef.current.getStatusAsync();
+      await audioRef.current.setPositionAsync(newPosition)
+      const status = await audioRef.current.getStatusAsync()
       if (status.isLoaded && !status.isPlaying) {
-        await audioRef.current.playAsync();
-        setIsPlaying(true);
+        await audioRef.current.playAsync()
+        setIsPlaying(true)
       }
     }
-  };
+  }
 
   // Replay
   const handleReplay = async () => {
     if (post.mediaType === "video" && videoRef.current) {
-      awaitOrIgnore(() => videoRef.current!.setPositionAsync(0));
-      awaitOrIgnore(() => videoRef.current!.playAsync());
-      setIsPlaying(true);
+      awaitOrIgnore(() => videoRef.current!.setPositionAsync(0))
+      awaitOrIgnore(() => videoRef.current!.playAsync())
+      setIsPlaying(true)
     } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
-      awaitOrIgnore(() => audioRef.current!.setPositionAsync(0));
-      awaitOrIgnore(() => audioRef.current!.playAsync());
-      setIsPlaying(true);
+      awaitOrIgnore(() => audioRef.current!.setPositionAsync(0))
+      awaitOrIgnore(() => audioRef.current!.playAsync())
+      setIsPlaying(true)
     }
-  };
+  }
 
   // Cleanup
   useEffect(() => {
     return () => {
       if (post.mediaType === "photo" && post.audio && audioRef.current) {
-        awaitOrIgnore(() => audioRef.current!.pauseAsync());
+        awaitOrIgnore(() => audioRef.current!.pauseAsync())
       }
       if (post.mediaType === "video" && videoRef.current) {
-        awaitOrIgnore(() => videoRef.current!.pauseAsync());
+        awaitOrIgnore(() => videoRef.current!.pauseAsync())
       }
-    };
-  }, []);
+    }
+  }, [])
 
   // Log de hoogte van de post zodra deze is gerenderd
   const handleLayout = (event: any) => {
-    const { height } = event.nativeEvent.layout;
-    console.log("Post height:", height);
-  };
-
-
-
-
-
-
-
-
-
+    const { height } = event.nativeEvent.layout
+    console.log("Post height:", height)
+  }
 
   return (
     <View style={styles.fullScreen}>
@@ -439,10 +450,7 @@ const PostComponent: React.FC<PostProps> = ({
             isLooping={false}
           />
         ) : (
-          <Image
-            source={{ uri: post.mediaUrl as string }}
-            style={StyleSheet.absoluteFill}
-          />
+          <Image source={{ uri: post.mediaUrl as string }} style={StyleSheet.absoluteFill} />
         )}
         <BlurView
           intensity={45}
@@ -456,271 +464,355 @@ const PostComponent: React.FC<PostProps> = ({
           ]}
         />
       </View>
-  
-      {/* ───── fade van blur naar zwart ───── */}
-      <LinearGradient
-        colors={["transparent", "black"]}
-        locations={[0.1, 0.2]}
-        style={StyleSheet.absoluteFill}
-      />
-  
 
-  
+      {/* ───── fade van blur naar zwart ───── */}
+      <LinearGradient colors={["transparent", "black"]} locations={[0.0, 0.0]} style={StyleSheet.absoluteFill} />
+
       {/* jouw bestaande post-container */}
       <View style={styles.postContainer} onLayout={handleLayout}>
-        <Pressable onPress={handlePlayPause} style={styles.mediaContainer}>
-          {/* media */}
-          {post.mediaType === "video" ? (
-            <Video
-              ref={videoRef}
-              source={{ uri: post.mediaUrl as string }}
-              style={styles.media}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay={false}
-              isLooping
-              useNativeControls={false}
+        {/* Indicator dots at the top */}
+        <View style={styles.dotsContainer}>
+          {Array.from({ length: totalSlides }).map((_, index) => (
+            <TouchableOpacity
+              key={index}
+              onPress={() => handleDotPress(index)}
+              style={[styles.dot, activeSlide === index && styles.activeDot]}
             />
-          ) : (
-            <Image
-              source={{ uri: post.mediaUrl as string }}
-              style={styles.media}
-            />
-          )}
-  
-     {/* controls */}
-<View style={styles.controlsContainer}>
-  {/* huidige tijd */}
-  <View style={styles.timeLabelCurrent}>
-    <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-  </View>
+          ))}
+        </View>
 
-  {/* slider zelf */}
-  <View style={styles.seekbarContainer}>
-    <Slider
-      style={{ width: scale * 250, transform: [{ scaleY: 1.5 }] }}
-      minimumValue={0}
-      maximumValue={1}
-      value={duration ? currentTime / duration : 0}
-      minimumTrackTintColor="#FFFFFF"
-      maximumTrackTintColor="#000000"
-      thumbTintColor="#FFFFFF00"
-      onSlidingComplete={handleSlidingComplete}
-    />
-  </View>
+        {/* Horizontal ScrollView for slides */}
+        <ScrollView
+          ref={scrollViewRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
+          onMomentumScrollEnd={handleScrollEnd}
+          scrollEventThrottle={16}
+          style={styles.slideContainer}
+        >
+          {/* Slide 1 - Media Content */}
+          <View style={styles.slide}>
+            <Pressable onPress={handlePlayPause} style={styles.mediaContainer}>
+              {/* media */}
+              {post.mediaType === "video" ? (
+                <Video
+                  ref={videoRef}
+                  source={{ uri: post.mediaUrl as string }}
+                  style={styles.media}
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay={false}
+                  isLooping
+                  useNativeControls={false}
+                />
+              ) : (
+                <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
+              )}
 
-  {/* resterende tijd */}
-  <View style={styles.timeLabelRemaining}>
-    <Text style={styles.timeText}>-{formatTime(duration - currentTime)}</Text>
-  </View>
+              {/* Play icon overlay when paused */}
+              {!isPlaying && manualPaused && (
+                <View style={styles.playIconOverlay}>
+                  <Svg width={50} height={50} viewBox="0 0 24 24" fill="none">
+                    <Path
+                      d="M8 5.14v14l11-7-11-7z"
+                      fill="white"
+                      stroke="white"
+                      strokeWidth={1.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </Svg>
+                </View>
+              )}
 
-  {/* replay-knop */}
-  <ReplayButton onPress={handleReplay} />
-</View>
+              {/* controls */}
+              <View style={styles.controlsContainer}>
+                {/* huidige tijd */}
+                <View style={styles.timeLabelCurrent}>
+                  <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+                </View>
 
-  
-          {/* info overlay */}
-          <View style={styles.infoOverlay}>
-            <Text style={styles.postTitle}>{post.title}</Text>
-            <Text
-              style={[
-                styles.postDescription,
-                { marginBottom: descriptionExpanded ? 10 : 0 },
-              ]}
-              numberOfLines={descriptionExpanded ? undefined : 2}
-            >
-              {post.description}
-            </Text>
-            <Text
-              style={[styles.postDescription, styles.hiddenText]}
-              onTextLayout={(e) => {
-                if (e.nativeEvent.lines.length > 2 && !showSeeMore)
-                  setShowSeeMore(true);
-              }}
-            >
-              {post.description}
-            </Text>
-            {showSeeMore && (
-              <TouchableOpacity onPress={toggleDescription}>
-                <Text style={styles.seeMoreText}>
-                  {descriptionExpanded ? "See less" : "See more"}
+                {/* slider zelf */}
+                <View style={styles.seekbarContainer}>
+                  <Slider
+                    style={{ width: scale * 250, transform: [{ scaleY: 1.5 }] }}
+                    minimumValue={0}
+                    maximumValue={1}
+                    value={duration ? currentTime / duration : 0}
+                    minimumTrackTintColor="#FFFFFF"
+                    maximumTrackTintColor="#000000"
+                    thumbTintColor="#FFFFFF00"
+                    onSlidingComplete={handleSlidingComplete}
+                  />
+                </View>
+
+                {/* resterende tijd */}
+                <View style={styles.timeLabelRemaining}>
+                  <Text style={styles.timeText}>-{formatTime(duration - currentTime)}</Text>
+                </View>
+
+                {/* replay-knop */}
+                <ReplayButton onPress={handleReplay} />
+              </View>
+
+              {/* info overlay */}
+              <View style={styles.infoOverlay}>
+                <Text style={styles.postTitle}>{post.title}</Text>
+
+                {/* Make the description text touchable */}
+                <TouchableOpacity onPress={toggleDescription} activeOpacity={0.8}>
+                  <Text
+                    style={[styles.postDescription, { marginBottom: descriptionExpanded ? 10 : 0 }]}
+                    numberOfLines={descriptionExpanded ? undefined : 2}
+                  >
+                    {post.description}
+                  </Text>
+                </TouchableOpacity>
+
+                <Text
+                  style={[styles.postDescription, styles.hiddenText]}
+                  onTextLayout={(e) => {
+                    if (e.nativeEvent.lines.length > 2 && !showSeeMore) setShowSeeMore(true)
+                  }}
+                >
+                  {post.description}
                 </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-  
-          {/* tags-overlay bottom-left */}
-          <View style={styles.tagsOverlay}>
-            <TouchableOpacity onPress={expandArtistTags}>
-              <View style={styles.artistTagsContainer}>
-                {post.artistTags?.map((tagId, index) => {
-                  const foundTag = artistTags.find((t) => t.id === tagId);
-                  if (!foundTag) return null;
-                  const animatedMargin =
-                    index === 0
-                      ? 0
-                      : toggleAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [-10, 0],
-                        });
-                  return (
-                    <Animated.View
-                      key={foundTag.id}
-                      style={{ marginLeft: animatedMargin }}
-                    >
-                      <ArtistTag
-                        id={foundTag.id}
-                        name={foundTag.name}
-                        image={foundTag.image}
-                        disableModuleOpen={!artistExpanded}
-                      />
-                    </Animated.View>
-                  );
-                })}
+
+                {showSeeMore && (
+                  <TouchableOpacity onPress={toggleDescription}>
+                    <Text style={styles.seeMoreText}>{descriptionExpanded ? "See less" : "See more..."}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-            </TouchableOpacity>
-  
-            <TouchableOpacity onPress={collapseArtistTags}>
-              <View style={styles.genreTagsContainer}>
-                {post.genreTags?.map((tagId, index) => {
-                  const foundTag = genreTags.find((t) => t.id === tagId);
-                  if (!foundTag) return null;
-                  const animatedMargin =
-                    index === 0
-                      ? 0
-                      : toggleAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [2, -20],
-                        });
-                  return (
-                    <Animated.View
-                      key={foundTag.id}
-                      style={{ marginLeft: animatedMargin }}
-                    >
-                      <GenreTag id={foundTag.id} name={foundTag.name} />
-                    </Animated.View>
-                  );
-                })}
+
+              {/* tags-overlay bottom-left */}
+              <View style={styles.tagsOverlay}>
+                <TouchableOpacity onPress={expandArtistTags}>
+                  <View style={styles.artistTagsContainer}>
+                    {post.artistTags?.map((tagId, index) => {
+                      const foundTag = artistTags.find((t) => t.id === tagId)
+                      if (!foundTag) return null
+                      const animatedMargin =
+                        index === 0
+                          ? 0
+                          : toggleAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [-10, 0],
+                            })
+                      return (
+                        <Animated.View key={foundTag.id} style={{ marginLeft: animatedMargin }}>
+                          <ArtistTag
+                            id={foundTag.id}
+                            name={foundTag.name}
+                            image={foundTag.image}
+                            disableModuleOpen={!artistExpanded}
+                          />
+                        </Animated.View>
+                      )
+                    })}
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={collapseArtistTags}>
+                  <View style={styles.genreTagsContainer}>
+                    {post.genreTags?.map((tagId, index) => {
+                      const foundTag = genreTags.find((t) => t.id === tagId)
+                      if (!foundTag) return null
+                      const animatedMargin =
+                        index === 0
+                          ? 0
+                          : toggleAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [2, -20],
+                            })
+                      return (
+                        <Animated.View key={foundTag.id} style={{ marginLeft: animatedMargin }}>
+                          <GenreTag id={foundTag.id} name={foundTag.name} />
+                        </Animated.View>
+                      )
+                    })}
+                  </View>
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
+            </Pressable>
           </View>
-  
- 
- 
-  {/* acties-overlay bottom-right */}
-          {currentUserId && (
-            <View style={styles.actionsOverlay}>
-  
-  
-  {/* ─── Like ─── */}
-<TouchableOpacity
-  style={styles.likeButton}
-  onPress={toggleLike}
-  disabled={likeLoading}
->
-  <Like liked={liked} onPress={toggleLike} />
 
-    <Text style={styles.counterText}>{formatCount(likeCount)}</Text>
-  
-</TouchableOpacity>
+          {/* Slide 2 - Profile Info */}
+          <View style={styles.slide}>
+            <View style={styles.profileBubble}>
+              {/* Profile content will go here */}
+              <ScrollView
+                style={styles.profileScrollView}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.profileScrollContent}
+              >
+                {/* Profile Banner */}
+                <View style={styles.profileBanner}>
+                  <Image source={{ uri: profile?.profileBanner }} style={styles.profileBannerImage} />
+                  <View style={styles.profileBannerOverlay}>
+                    <Text style={styles.profileUsername}>{profile?.username}</Text>
+                    <TouchableOpacity style={styles.followButtonSmall}>
+                      <Text style={styles.followButtonText}>Follow</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
 
+                {/* About Me Section */}
+                <View style={styles.profileSection}>
+                  <Text style={styles.sectionTitle}>About me</Text>
+                  <Text style={styles.sectionText}>{profile?.bio}</Text>
+                </View>
 
+                {/* Stats Section */}
+                <View style={styles.profileSection}>
+                  <Text style={styles.sectionTitle}>Stats</Text>
+                  <View style={styles.statsContainer}>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statNumber}>42</Text>
+                      <Text style={styles.statLabel}>Tracks</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statNumber}>128</Text>
+                      <Text style={styles.statLabel}>Collabs</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statNumber}>{formatCount(followCount)}</Text>
+                      <Text style={styles.statLabel}>Followers</Text>
+                    </View>
+                  </View>
+                </View>
 
-
-  <TouchableOpacity
-    style={styles.saveButton}
-    onPress={toggleSave}           // hook aanroepen
-    disabled={saveLoading}         // voorkom dubbelklikken
-  >
-    <SaveButton 
-      saved={saved}                // icoon-staat
-      onPress={toggleSave}         // callback voor animatie/feedback
-      postId={post.id}             // als je ‘m elders nodig hebt
-      userId={currentUserId}       // idem
-    />
-    
-    <Text style={styles.counterText}>{formatCount(saveCount)}</Text>
-  
-  </TouchableOpacity>
-
-
-
-
-    {/* Follow Button */}
-    <TouchableOpacity
-              style={styles.followButton}
-              onPress={toggleFollow}
-              disabled={followLoading}
-            >
-              <Follow followerId={currentUserId} followingId={post.userId  } onPress={toggleFollow}  />
-              <Text style={styles.counterText}>{formatCount(followCount)}</Text>
-            </TouchableOpacity>
-
+                {/* Additional sections can be added here */}
+              </ScrollView>
             </View>
-          )}
-        </Pressable>
-  
+          </View>
+
+          {/* Slide 3 - Additional Info */}
+          <View style={styles.slide}>
+            <View style={styles.profileBubble}>
+              <View style={styles.equipmentContainer}>
+                <Text style={styles.sectionTitle}>Equipment</Text>
+                <View style={styles.equipmentItem}>
+                  <Text style={styles.equipmentLabel}>DAW</Text>
+                  <Text style={styles.equipmentValue}>Ableton Live 11</Text>
+                </View>
+                <View style={styles.equipmentItem}>
+                  <Text style={styles.equipmentLabel}>Instruments</Text>
+                  <Text style={styles.equipmentValue}>Guitar, Piano, Synths</Text>
+                </View>
+                <View style={styles.equipmentItem}>
+                  <Text style={styles.equipmentLabel}>Plugins</Text>
+                  <Text style={styles.equipmentValue}>Serum, Omnisphere, Valhalla</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+
         {/* timestamp */}
         <View style={styles.timestampContainer}>
           <Timestamp timestamp={post.timestamp} />
         </View>
-  
-        {/* header overlay */}
-        <View style={styles.postHeaderOverlay}>
-          <View style={styles.profileContainer}>
-            <ProfileLink userId={post.userId}>
-              <Image
-                source={{ uri: post.profileImage }}
-                style={{
-                  width: scale * 25,
-                  height: scale * 25,
-                  borderRadius: scale * 15,
-                }}
-              />
-            </ProfileLink>
-            <ProfileLink userId={post.userId}>
-              <View style={styles.userInfo}>
-                <Text style={styles.usernameText}>{post.username}</Text>
-                <Text style={styles.displayNameText}>
-                  {post.display_name} <Text style={styles.dot}>•</Text>{" "}
-                  {post.role}
-                </Text>
-              </View>
-            </ProfileLink>
-          </View>
-          <View style={styles.headerTags}>
-            {/* …animated header tags (unchanged)… */}
-          </View>
-          <View style={styles.headerDivider} />
-        </View>
 
-         {/* MoreOptions tussen profile en collab */}
-    <TouchableOpacity style={styles.moreOptionsButton}>
-      <MoreOptions
-        style={styles.moreOptionsButton}
-        menuStyle={{ top: scale * 575, left: scale * 115 }}
-      />
-    </TouchableOpacity>
-  
-        {/* collab button */}
-        <View style={styles.collabContainer}>
-          {currentUserId ? (
-            <Collab
-              senderId={currentUserId}
-              receiverId={post.userId}
-              postId={post.id}
-            />
-          ) : (
-            <TouchableOpacity style={styles.collabDisabled} disabled>
-              <Text style={styles.collabText}>LOGIN TO COLLAB!</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* Horizontally scrollable bottom section */}
+        <ScrollView
+          ref={bottomScrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: bottomScrollX } } }], {
+            useNativeDriver: false,
+          })}
+          onMomentumScrollEnd={handleBottomScrollEnd}
+          scrollEventThrottle={16}
+          style={styles.bottomScrollContainer}
+        >
+          {/* First page - Profile info and collab button */}
+          <View style={styles.bottomPage}>
+            <View style={styles.postHeaderOverlay}>
+              <View style={styles.profileContainer}>
+                <ProfileLink userId={post.userId}>
+                  <Image
+                    source={{ uri: post.profileImage }}
+                    style={{
+                      width: scale * 25,
+                      height: scale * 25,
+                      borderRadius: scale * 15,
+                    }}
+                  />
+                </ProfileLink>
+                <ProfileLink userId={post.userId}>
+                  <View style={styles.userInfo}>
+                    <Text style={styles.usernameText}>{post.username}</Text>
+                    <Text style={styles.displayNameText}>
+                      {post.display_name} <Text style={styles.dot}>•</Text> {post.role}
+                    </Text>
+                  </View>
+                </ProfileLink>
+              </View>
+
+              {/* MoreOptions button - centered */}
+              <TouchableOpacity style={styles.moreOptionsButton}>
+                <MoreOptions style={styles.moreOptionsButton} menuStyle={{ top: scale * 575, left: scale * 115 }} />
+              </TouchableOpacity>
+
+              {/* collab button */}
+              <View style={styles.collabContainer}>
+                {currentUserId ? (
+                  <Collab senderId={currentUserId} receiverId={post.userId} postId={post.id} />
+                ) : (
+                  <TouchableOpacity style={styles.collabDisabled} disabled>
+                    <Text style={styles.collabText}>LOGIN TO COLLAB!</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+
+          {/* Second page - Action buttons */}
+          <View style={styles.bottomPage}>
+            <View style={styles.actionsContainer}>
+              {currentUserId && (
+                <>
+                  {/* Like Button */}
+                  <View style={styles.actionItem}>
+                    <TouchableOpacity style={styles.actionButton} onPress={toggleLike} disabled={likeLoading}>
+                      <View style={styles.actionWithCount}>
+                        <Like liked={liked} onPress={toggleLike} />
+                        <Text style={styles.counterText}>{formatCount(likeCount)}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Save Button */}
+                  <View style={styles.actionItem}>
+                    <TouchableOpacity style={styles.actionButton} onPress={toggleSave} disabled={saveLoading}>
+                      <View style={styles.actionWithCount}>
+                        <SaveButton saved={saved} onPress={toggleSave} postId={post.id} userId={currentUserId} />
+                        <Text style={styles.counterText}>{formatCount(saveCount)}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Follow Button */}
+                  <View style={styles.actionItem}>
+                    <TouchableOpacity style={styles.actionButton} onPress={toggleFollow} disabled={followLoading}>
+                      <View style={styles.actionWithCount}>
+                        <Follow followerId={currentUserId} followingId={post.userId} onPress={toggleFollow} />
+                        <Text style={styles.counterText}>{formatCount(followCount)}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
+          </View>
+        </ScrollView>
       </View>
     </View>
-  );
-  
-  
-};
+  )
+}
 
 const styles = StyleSheet.create({
   fullScreen: {
@@ -728,46 +820,210 @@ const styles = StyleSheet.create({
     width: windowWidth,
     height: 780,
     backgroundColor: "#000",
-    
-  
   },
-
-
   postContainer: {
     backgroundColor: "transparent",
     borderRadius: scale * 15,
-    
     height: "auto",
-    width: scale * 365,
+    width: windowWidth,
     alignSelf: "center",
-    
-  
-    
-
+  },
+  // Dots indicator styles
+  dotsContainer: {
+    position: "absolute",
+    top: scale * 10,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  dot: {
+    width: scale * 5,
+    height: scale * 5,
+    borderRadius: scale * 4,
+    backgroundColor: "rgba(255, 255, 255, 0.4)",
+    marginHorizontal: scale * 4,
+    marginTop: scale * 7,
+  },
+  activeDot: {
+    backgroundColor: "white",
+    transform: [{ scale: 1.2 }],
+  },
+  // Slide container styles
+  slideContainer: {
+    width: windowWidth,
+    height: scale * 575,
+  },
+  slide: {
+    width: windowWidth,
+    height: scale * 575,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  // Bottom scrollable section
+  bottomScrollContainer: {
+    width: windowWidth,
+    height: scale * 60,
+    marginTop: scale * -15,
+  },
+  bottomPage: {
+    width: windowWidth,
+    height: scale * 35,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: scale * 10,
+  },
+  // Actions container in second page
+  actionsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    width: "100%",
+    paddingHorizontal: scale * 20,
+    transform: [{ translateY: scale * 3 }],
+  },
+  actionItem: {
+    alignItems: "center",
+    marginHorizontal: scale * 15,
+  },
+  actionButton: {
+    marginBottom: scale * 5,
+  },
+  actionWithCount: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  counterText: {
+    color: "white",
+    fontSize: scale * 12,
+    fontWeight: "bold",
+    marginLeft: scale * 8,
+  },
+  // Profile bubble styles
+  profileBubble: {
+    width: windowWidth,
+    height: scale * 575,
+    backgroundColor: "#191919",
+    borderRadius: scale * 10,
+    overflow: "hidden",
+    marginHorizontal: scale * 10,
+  },
+  profileScrollView: {
+    flex: 1,
+  },
+  profileScrollContent: {
+    padding: scale * 15,
+  },
+  profileBanner: {
+    width: "100%",
+    height: scale * 180,
+    borderRadius: scale * 15,
+    overflow: "hidden",
+    marginBottom: scale * 20,
+    position: "relative",
+    marginTop: scale * 20,
+  },
+  profileBannerImage: {
+    width: "100%",
+    height: "100%",
+  },
+  profileBannerOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    padding: scale * 15,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  profileUsername: {
+    color: "white",
+    fontSize: scale * 18,
+    fontWeight: "bold",
+    textShadowColor: "rgba(0, 0, 0, 0.75)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  followButtonSmall: {
+    backgroundColor: "transparent",
+    borderColor: "white",
+    borderWidth: 1,
+    borderRadius: scale * 15,
+    paddingHorizontal: scale * 12,
+    paddingVertical: scale * 5,
+  },
+  followButtonText: {
+    color: "white",
+    fontSize: scale * 12,
+  },
+  profileSection: {
+    backgroundColor: "#2B2B2B",
+    borderRadius: scale * 15,
+    padding: scale * 15,
+    marginBottom: scale * 15,
+  },
+  sectionTitle: {
+    color: "white",
+    fontSize: scale * 16,
+    fontWeight: "bold",
+    marginBottom: scale * 10,
+  },
+  sectionText: {
+    color: "rgba(255, 255, 255, 0.8)",
+    fontSize: scale * 14,
+    lineHeight: scale * 20,
+  },
+  statsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  statItem: {
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    borderRadius: scale * 10,
+    padding: scale * 10,
+    alignItems: "center",
+    width: "30%",
+  },
+  statNumber: {
+    color: "white",
+    fontSize: scale * 18,
+    fontWeight: "bold",
+  },
+  statLabel: {
+    color: "rgba(255, 255, 255, 0.7)",
+    fontSize: scale * 12,
+    marginTop: scale * 5,
+  },
+  equipmentContainer: {
+    padding: scale * 20,
+  },
+  equipmentItem: {
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    borderRadius: scale * 10,
+    padding: scale * 15,
+    marginBottom: scale * 10,
+  },
+  equipmentLabel: {
+    color: "white",
+    fontSize: scale * 14,
+    fontWeight: "bold",
+    marginBottom: scale * 5,
+  },
+  equipmentValue: {
+    color: "rgba(255, 255, 255, 0.7)",
+    fontSize: scale * 12,
   },
   postHeaderOverlay: {
-    paddingHorizontal: scale * 10,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     height: scale * 40,
-    transform: [{ translateY: -15 }]
-    
-  },
-  
-  blurBackground: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: scale * 42,
-    borderTopLeftRadius: scale * 10,
-    borderTopRightRadius: scale * 10,
-    borderBottomLeftRadius: scale * 10,
-    borderBottomRightRadius: scale * 10,
-    overflow: "hidden",
-    zIndex: 0,
-
-
+    width: "100%",
   },
   headerDivider: {
     position: "absolute",
@@ -776,30 +1032,29 @@ const styles = StyleSheet.create({
     right: scale * 10,
     height: StyleSheet.hairlineWidth * 2,
     backgroundColor: "rgba(255,255,255,0.6)",
-    opacity: 0
+    opacity: 0,
   },
   profileContainer: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
+
+
   },
   userInfo: {
     marginLeft: scale * 5,
-    marginTop: scale * 2
+    marginTop: scale * 2,
   },
   usernameText: {
     color: "white",
     fontSize: scale * 12,
     fontWeight: "bold",
-    
   },
   displayNameText: {
     color: "white",
     fontSize: scale * 8,
-    
   },
-  dot: {
-    marginHorizontal: scale * 3,
-  },
+  
   headerTags: {
     flexDirection: "row",
     alignItems: "center",
@@ -807,48 +1062,48 @@ const styles = StyleSheet.create({
   artistTagsContainer: {
     flexDirection: "row",
     alignItems: "center",
-      // iOS shadow
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 3,
-  
-      // Android elevation
-      elevation: 4,
-      
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
   },
   genreTagsContainer: {
     flexDirection: "row",
     alignItems: "center",
     marginLeft: scale * 10,
-      // iOS shadow
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 3,
-  
-      // Android elevation
-      elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
   },
   mediaContainer: {
     width: windowWidth,
     borderRadius: scale * 10,
     overflow: "hidden",
     backgroundColor: "#000",
-    height: scale * 575 ,
+    height: scale * 575,
     alignSelf: "center",
     position: "relative",
-    
-
-
-   
-    
   },
   media: {
     width: "100%",
     height: "100%",
     position: "relative",
     zIndex: 0,
+  },
+  // Play icon overlay styles
+  playIconOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 5,
+    opacity: 0.7,
   },
   controlsContainer: {
     position: "absolute",
@@ -866,63 +1121,60 @@ const styles = StyleSheet.create({
     alignItems: "center",
     bottom: scale * 10,
     right: scale * 25,
-    opacity: 0
+    opacity: 0,
   },
   seekbarContainer: {
     width: scale * 200,
-    right: scale * 10
- },
-
- timeLabelCurrent: {
-  width: scale * 40,
-  alignItems: "center",
-  right: scale * 5
-},
-timeLabelRemaining: {
-  width: scale * 40,
-  alignItems: "center",
-  left: scale * 40
-},
- timeText: {
-  color: "white",
-  fontSize: scale * 12,
-
-},
-
+    right: scale * 10,
+  },
+  timeLabelCurrent: {
+    width: scale * 40,
+    alignItems: "center",
+    right: scale * 5,
+  },
+  timeLabelRemaining: {
+    width: scale * 40,
+    alignItems: "center",
+    left: scale * 40,
+  },
+  timeText: {
+    color: "white",
+    fontSize: scale * 12,
+  },
   placeholder: {
     width: scale * 40,
     height: scale * 40,
-
-    
   },
   infoOverlay: {
     position: "absolute",
-    bottom: scale * 120,
+    bottom: scale * 115,
     left: scale * 2,
-    right: scale * 10,  // Zorg ervoor dat de tekst niet helemaal naar rechts uitstrekt
+    right: scale * 10,
     backgroundColor: "rgba(0,0,0,0.0)",
     borderRadius: scale * 5,
     padding: scale * 10,
-    width: "80%",  // Zorg ervoor dat de breedte van de tekst niet te breed is
+    width: "80%",
   },
   postTitle: {
     color: "white",
     fontSize: scale * 16,
     fontWeight: "bold",
     marginBottom: scale * 5,
-    maxWidth: "100%",  // Zorg ervoor dat de titel binnen de container past
-    textOverflow: "ellipsis",  // Voeg ellipsis toe voor te lange tekst
-    overflow: "hidden",  // Verberg de tekst die buiten de container valt
+    maxWidth: "100%",
+    textOverflow: "ellipsis",
+    overflow: "hidden",
+    transform: [{ translateY: scale * 20}],
     
   },
   postDescription: {
     color: "white",
     fontSize: scale * 14,
-    maxWidth: "100%",  // Zorg ervoor dat de beschrijving niet buiten de container valt
-    textOverflow: "ellipsis",  // Voeg ellipsis toe voor te lange tekst
-    overflow: "hidden",  // Verberg de tekst die buiten de container valt
-   
-    marginBottom: scale * 10,  // Geef wat ruimte tussen de beschrijving en de knop
+    maxWidth: "100%",
+    textOverflow: "ellipsis",
+    overflow: "hidden",
+    marginBottom: scale * 10,
+    transform: [{ translateY: scale * 20 }],
+    
   },
   hiddenText: {
     position: "absolute",
@@ -930,10 +1182,12 @@ timeLabelRemaining: {
     zIndex: -1,
   },
   seeMoreText: {
-    color: "#fff",
+    color: "white", // Grey color
     fontSize: scale * 12,
     marginTop: scale * 4,
-    textDecorationLine: "underline",
+    fontWeight: "bold",
+    fontStyle: "italic",
+    transform: [{ translateY: scale * 20 }],
   },
   tagsOverlay: {
     position: "absolute",
@@ -942,104 +1196,24 @@ timeLabelRemaining: {
     flexDirection: "row",
     alignItems: "center",
     zIndex: 2,
+    transform: [{ translateY: scale * 15 }],
   },
-  actionsOverlay: {
-    position: "absolute",
-    bottom: scale * 60,   // pas aan naar wens
-    left: scale * 330,
-    flexDirection: "column",
-    alignItems: "center",
-    zIndex: 2,
-    justifyContent: 'flex-start',  // Knoppen blijven links uitgelijnd
-  },
-  
   timestampContainer: {
     marginVertical: scale * 5,
     alignItems: "center",
     bottom: scale * 8,
     opacity: 0,
   },
-
-  likeButton: {
-    position: 'relative', // Hiermee zet je de knop op een vaste positie
-
-    flexDirection: "column", // Horizontale richting voor knop en teller
-    alignItems: "center", // Centreren van items
-    justifyContent: 'flex-start', // Zorgt ervoor dat alles naar rechts wordt uitgelijnd
-     // iOS shadow
-     shadowColor: "#000",
-     shadowOffset: { width: 0, height: 2 },
-     shadowOpacity: 0.3,
-     shadowRadius: 3,
- 
-     // Android elevation
-     elevation: 4,
-
-  },
-  counterText: {
-    color: "white",
-    transform: [{ translateX: -2 }],  // Verschuif het icoon 5 eenheden naar links
-    fontSize: scale * 12,
-    fontWeight: "medium",
-    marginTop: scale * 5,
-    marginBottom: scale * 15,
-    marginLeft: scale * 3,
-    textAlign: "center",
-     // iOS shadow
-     shadowColor: "#000",
-     shadowOffset: { width: 0, height: 2 },
-     shadowOpacity: 0.3,
-     shadowRadius: 3,
- 
-     // Android elevation
-     elevation: 4,
-  },
-  
-  saveButton: {
-    position: 'relative', // Hiermee zet je de knop op een vaste positie
-  
-    flexDirection: "column", // Horizontale richting voor knop en teller
-    alignItems: "center", // Centreren van items
-    justifyContent: 'flex-start',  // Wijzig dit naar 'flex-start'
-     // iOS shadow
-     shadowColor: "#000",
-     shadowOffset: { width: 0, height: 2 },
-     shadowOpacity: 0.3,
-     shadowRadius: 3,
- 
-     // Android elevation
-     elevation: 4,
-    
-
-  },
-  followButton: {
-  position: 'relative', // Hiermee zet je de knop op een vaste positie
-
-  flexDirection: "column", // Horizontale richting voor knop en teller
-  alignItems: "center", // Centreren van items
-  justifyContent: 'flex-start',  // Wijzig dit naar 'flex-start'
-  transform: [{ translateX: -3 }],  // Verschuif het icoon 5 eenheden naar links
-   // iOS shadow
-   shadowColor: "#000",
-   shadowOffset: { width: 0, height: 2 },
-   shadowOpacity: 0.3,
-   shadowRadius: 3,
-
-   // Android elevation
-   elevation: 4,
-  
-
-  },
   moreOptionsButton: {
-   right: scale * 83,
-   transform: [{ translateY: -28 }]
-   
+    alignItems: "center",
+    justifyContent: "center",
+    transform: [{ translateX: scale * 190 }],
+    top: scale * 2,
+    position: "absolute",
   },
   collabContainer: {
-    position: "absolute",
-    left: scale * 265,
-    top : scale * 590,
-    width: scale * 91
+    alignItems: "center",
+    justifyContent: "center",
   },
   collabDisabled: {
     opacity: 0.5,
@@ -1047,12 +1221,6 @@ timeLabelRemaining: {
   collabText: {
     color: "#fff",
   },
-  buttonWrapper: {
-    margin: scale * 3,
-  },
-  postActions: {
-    left: scale * 18,
-  },
-});
+})
 
-export default PostComponent;
+export default PostComponent
