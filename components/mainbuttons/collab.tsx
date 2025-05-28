@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Animated, TouchableOpacity, Text, StyleSheet, Easing } from "react-native";
+import { Animated, Text, StyleSheet, View } from "react-native";
+import { PanGestureHandler, State } from "react-native-gesture-handler";
 import { supabase } from "../../supabaseClient";
-import { LinearGradient } from "expo-linear-gradient";
-
-import {useFonts} from 'expo-font';
-
+import { useFonts } from 'expo-font';
 
 interface CollabProps {
   senderId: string;
@@ -14,13 +12,28 @@ interface CollabProps {
 
 const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
   const [status, setStatus] = useState<"none" | "pending" | "accepted" | "rejected">("none");
+  const [isComplete, setIsComplete] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const [locallyCompleted, setLocallyCompleted] = useState(false); // NEW: Track local completion
 
   const [fontsLoaded] = useFonts({
-    'BebasNeue-Regular': require('../../assets/fonts/BebasNeue-Regular.ttf'),
-  }); 
+    'BebasNeue-Regular': require('../../assets/fonts/Manrope-VariableFont_wght.ttf'),
+  });
 
+  // Animation values
+  const translateX = useRef(new Animated.Value(0)).current;
+  const arrowOpacity1 = useRef(new Animated.Value(0.3)).current;
+  const arrowOpacity2 = useRef(new Animated.Value(0.3)).current;
+  const arrowOpacity3 = useRef(new Animated.Value(0.3)).current;
+  const blueOpacity = useRef(new Animated.Value(0)).current;
+  const popupScale = useRef(new Animated.Value(0)).current;
+  const handleScale = useRef(new Animated.Value(1)).current;
 
-  // Realtime abonnement voor status updates
+  const buttonWidth = 280;
+  const handleWidth = 56;
+  const maxTranslate = buttonWidth - handleWidth - 10;
+
+  // Your existing Supabase logic - UNCHANGED
   useEffect(() => {
     const subscription = supabase
       .channel("collab_requests_channel")
@@ -45,11 +58,13 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
     };
   }, [senderId, postId]);
 
-  const handlePress = async () => {
+  // Modified database logic - Don't set status immediately
+  const handleCollabRequest = async () => {
     if (status === "pending") {
       console.log("Er is al een verzoek in behandeling.");
       return;
     }
+    
     const { data, error } = await supabase
       .from("collab_requests")
       .insert([
@@ -66,103 +81,378 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
     if (error && Object.keys(error).length > 0) {
       console.error("Fout bij verzenden collab request:", error);
       return;
-    } else {
-      setStatus("pending");
     }
+    // REMOVED: setStatus("pending") - let the subscription handle this
+    // The popup will stay visible until the subscription updates the status
   };
 
-  // Maak een Animated.Value aan
-  const animValue = useRef(new Animated.Value(0)).current;
-
-  // Functie die de animatie start
-  const startAnimation = useCallback(() => {
-    // Reset de animatie-waarde
-    animValue.setValue(0);
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(animValue, {
-          toValue: 1,
-          duration: 4000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
-        }),
-        Animated.timing(animValue, {
-          toValue: 0,
-          duration: 4000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
-        }),
-      ])
-    ).start();
-  }, [animValue]);
-
-  // Start de animatie bij mount
+  // Arrow animation
   useEffect(() => {
-    startAnimation();
-  }, [startAnimation]);
+    const animateArrows = () => {
+      Animated.loop(
+        Animated.stagger(1000, [
+          Animated.sequence([
+            Animated.timing(arrowOpacity1, {
+              toValue: 0.8,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(arrowOpacity1, {
+              toValue: 0.3,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.sequence([
+            Animated.timing(arrowOpacity2, {
+              toValue: 0.8,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(arrowOpacity2, {
+              toValue: 0.3,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.sequence([
+            Animated.timing(arrowOpacity3, {
+              toValue: 0.8,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(arrowOpacity3, {
+              toValue: 0.3,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ]),
+        ])
+      ).start();
+    };
 
-  // Interpoleer de animated waarde naar de startpositie
-  // Wanneer animValue oploopt van 0 naar 1: start.x gaat van 0 naar 1
-  // Wanneer animValue teruggaat van 1 naar 0: start.x gaat weer van 1 naar 0,
-  // zodat de knop eerst donkerder wordt (donkere kleur meer dominant)
-  // en dan weer lichter (lichte kleur komt weer naar voren).
-  const animatedStartX = animValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
+    if (status === "none" && !locallyCompleted) {
+      animateArrows();
+    }
+  }, [status, locallyCompleted]);
+
+  // Handle swipe completion - MODIFIED: Track local completion
+  const handleSwipeComplete = async () => {
+    setIsComplete(true);
+    setShowPopup(true);
+    setLocallyCompleted(true); // NEW: Mark as locally completed
+
+    // Animate popup
+    Animated.spring(popupScale, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+
+    // Call your existing database logic
+    await handleCollabRequest();
+
+    // Popup stays visible permanently now
+  };
+
+  // Gesture handler events
+  const onGestureEvent = Animated.event(
+    [{ nativeEvent: { translationX: translateX } }],
+    { useNativeDriver: true }
+  );
+
+  const onHandlerStateChange = (event: any) => {
+    // Don't allow gestures if already completed
+    if (locallyCompleted) return;
+
+    if (event.nativeEvent.state === State.BEGAN) {
+      // Start drag - show blue background
+      Animated.timing(blueOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+      
+      // Scale down handle slightly
+      Animated.spring(handleScale, {
+        toValue: 0.95,
+        useNativeDriver: true,
+      }).start();
+    }
+
+    if (event.nativeEvent.state === State.END) {
+      const { translationX } = event.nativeEvent;
+      
+      // Scale handle back to normal
+      Animated.spring(handleScale, {
+        toValue: 1,
+        useNativeDriver: true,
+      }).start();
+      
+      if (translationX > maxTranslate ) {
+        // Complete the swipe
+        Animated.spring(translateX, {
+          toValue: maxTranslate,
+          useNativeDriver: true,
+        }).start(() => {
+          handleSwipeComplete();
+        });
+      } else {
+        // Bounce back with nice spring animation
+        Animated.spring(translateX, {
+          toValue: 5,
+          tension: 400,
+          friction: 8,
+          useNativeDriver: true,
+        }).start();
+        
+        // Hide blue background
+        Animated.timing(blueOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    }
+  };
 
   if (!fontsLoaded) {
     return null;
   }
 
-  
-  const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+  // MODIFIED: Show status container only if NOT locally completed
+  // If locally completed, show the swiper with popup instead
+  if (status !== "none" && !locallyCompleted) {
+    return (
+      <View style={styles.statusContainer}>
+        <Text style={styles.statusText}>
+          {status === "pending" ? "Request Sent" : 
+           status === "accepted" ? "Accepted!" : 
+           status === "rejected" ? "Declined" : "COLLAB!"}
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <TouchableOpacity onPress={handlePress} style={styles.buttonContainer}>
-      {/* Gebruik onLayout om de animatie opnieuw te starten wanneer de component wordt gelayout */}
-      <AnimatedLinearGradient
-        style={styles.collabButton}
-        onLayout={startAnimation}
-        start={{ x: animatedStartX, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        colors={["transparant", "transparant"]}
-      >
-        <Text style={styles.collabText}>
-          {status === "pending" ? "Request Sent" : "COLLAB!"}
-        </Text>
-      </AnimatedLinearGradient>
-    </TouchableOpacity>
+    <View style={styles.container}>
+      <View style={styles.track}>
+        {/* Blue background that smoothly follows from the left */}
+        <View style={styles.blueContainer}>
+          <Animated.View
+            style={[
+              styles.blueBackground,
+              {
+                opacity: blueOpacity,
+                transform: [
+                  // 1) schuif de pivot 1/2 breedte naar links
+                  { translateX: -buttonWidth / 2 },
+
+                  // 2) scaleX van 0→1 over de volle breedte
+                  {
+                    scaleX: translateX.interpolate({
+                      inputRange: [0, maxTranslate],
+                      outputRange: [0, 1],
+                      extrapolate: 'clamp',
+                    }),
+                  },
+
+                  // 3) schuif de pivot weer 1/2 breedte naar rechts
+                  { translateX: buttonWidth / 2 },
+                ],
+              },
+            ]}
+          />
+        </View>
+
+        {/* Text - Hide when completed */}
+        {!locallyCompleted && (
+          <View style={styles.textContainer}>
+            <Text style={styles.swipeText}>swipe to COLLAB!</Text>
+          </View>
+        )}
+
+        {/* Animated arrows - Hide when completed */}
+        {!locallyCompleted && (
+          <View style={styles.arrowContainer}>
+            <Animated.Text style={[styles.arrow, { opacity: arrowOpacity1 }]}>
+              {">"}
+            </Animated.Text>
+            <Animated.Text style={[styles.arrow, { opacity: arrowOpacity2 }]}>
+              {">"}
+            </Animated.Text>
+            <Animated.Text style={[styles.arrow, { opacity: arrowOpacity3 }]}>
+              {">"}
+            </Animated.Text>
+          </View>
+        )}
+
+        {/* Draggable handle with gesture handler */}
+        <PanGestureHandler
+          onGestureEvent={onGestureEvent}
+          onHandlerStateChange={onHandlerStateChange}
+        >
+          <Animated.View
+            style={[
+              styles.handle,
+              {
+                transform: [
+                  {
+                    translateX: translateX.interpolate({
+                      inputRange: [0, maxTranslate],
+                      outputRange: [0, maxTranslate],
+                      extrapolate: 'clamp',
+                    }),
+                  },
+                  { scale: handleScale },
+                ],
+              },
+            ]}
+          >
+            {isComplete && (
+              <Text style={styles.checkmark}>✓</Text>
+            )}
+          </Animated.View>
+        </PanGestureHandler>
+      </View>
+
+      {/* Success popup - Now stays visible permanently after completion */}
+      {showPopup && (
+        <Animated.View
+          style={[
+            styles.popup,
+            {
+              transform: [{ scale: popupScale }],
+            },
+          ]}
+        >
+          <Text style={styles.popupText}>✓ COLLAB! sent</Text>
+        </Animated.View>
+      )}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  buttonContainer: {
+  container: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  track: {
+    width: 280,
+    height: 56,
+    backgroundColor: 'rgba(130, 130, 130, 0.35)',
+    borderRadius: 28,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  blueContainer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    right: 0,
+    alignItems: 'flex-start', // Align to left
+    justifyContent: 'center',
     
   },
-  collabButton: {
-    paddingVertical: 3,
+  blueBackground: {
+    width: 280, // Full width
+    height: 56,
+    backgroundColor: '#0066ff',
+    borderRadius: 28,
+    
+  },
+  textContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swipeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
+    fontFamily: 'inter',
+  },
+  arrowContainer: {
+    position: 'absolute',
+    right: 24,
+    top: 0,
+    bottom: 2.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  arrow: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  handle: {
+    position: 'absolute',
+    left: 5,
+    top: 6,
+    width: 56,
+    height: 44,
+    backgroundColor: 'white',
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  checkmark: {
+    color: '#0066ff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  popup: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#0066ff',
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  popupText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    fontFamily: 'BebasNeue-Regular',
+  },
+  statusContainer: {
+    paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 12,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: "blue",
-
-    
-   
-    
+    backgroundColor: '#4800FF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  collabText: {
-    color: "white",
+  statusText: {
+    color: 'white',
     fontSize: 16,
-    textAlign: "center",
-    fontFamily: 'Boldonse-Regular',
     fontWeight: 'bold',
-    left: 1
-   
+    fontFamily: 'BebasNeue-Regular',
   },
 });
 

@@ -72,13 +72,13 @@ function TabsLayout() {
           color: 'white',
         },
         tabBarBackground: () => (
-          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView intensity={0} tint="dark" style={StyleSheet.absoluteFill} />
         ),
         tabBarStyle: Platform.select({
           ios: {
             position: 'absolute',
             height: 80,
-            backgroundColor: 'rgba(6, 6, 6, 0.81)',
+            backgroundColor: 'rgba(6, 6, 6, 0)',
             borderTopWidth: 0,
             paddingHorizontal: 25,      // <— minder zijdelingse ruimte
             justifyContent: 'space-evenly', // <— verdeel items compacter
