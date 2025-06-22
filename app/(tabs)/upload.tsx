@@ -523,6 +523,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     transform: [{ translateY: -20 }],
+    
     paddingBottom: 20,
   },
   closeBtn: {

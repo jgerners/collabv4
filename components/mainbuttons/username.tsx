@@ -11,7 +11,7 @@ const Username: React.FC<UsernameProps> = ({ name }) => {
     const [loaded] = useFonts({
       'BebasNeue-Regular': require('../../../assets/fonts/BebasNeue-Regular.ttf'),
     });
-  return <Text style={styles.username}>{name}</Text>;
+   return <Text style={styles.username}>{name.toLowerCase()}</Text>;
 };
 
 
@@ -20,8 +20,9 @@ const styles = StyleSheet.create({
   username: {
     marginLeft: 10,
     color: "white",
-    fontSize: 16,
+    fontSize: 13,
     fontFamily: 'BebasNeue-Regular',
+    
     
     
   },

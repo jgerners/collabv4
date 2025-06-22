@@ -7,6 +7,7 @@ const scale = windowWidth / 370;
 
 interface UserRoleProps {
   role: string;
+  style?: object;
 }
 
 const UserRole: React.FC<UserRoleProps> = ({ role }) => {

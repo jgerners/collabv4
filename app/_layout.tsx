@@ -1,4 +1,3 @@
-
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
@@ -11,6 +10,8 @@ import { RootStackParamList } from '../routes';
 import { AuthProvider, useAuth } from '../context/authContext'; // ✅ Import AuthContext
 import  EditProfile  from "./screens/editprofile";
 
+import { useFonts, Manrope_400Regular, Manrope_700Bold } from '@expo-google-fonts/manrope';
+
 import * as Haptics from 'expo-haptics'
 import { useContext } from 'react'
 import { ZoomContext, ZoomProvider } from '../context/zoomContext'
@@ -18,14 +19,11 @@ import { ZoomContext, ZoomProvider } from '../context/zoomContext'
 import { Ionicons } from '@expo/vector-icons';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-
-
 import FeedHeader from '../headers/FeedHeader';
 
 import UploadNavigator from '../navigation/UploadNavigator';
 
 import SelectMediaScreen from '../app/screens/SelectMediaScreen'
-
 
 import { StatusBar } from 'expo-status-bar';
 
@@ -47,14 +45,11 @@ import demoDetailScreen from './screens/demoDetailScreen';
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
-
-
 // ✅ Tab-navigatie (Alleen zichtbaar als de gebruiker is ingelogd)
 function TabsLayout() {
   const colorScheme = useColorScheme();
   const { profile } = useAuth(); // ✅ Profielfoto ophalen
   const zoom = useContext(ZoomContext)!
-
 
   return (
     <Tab.Navigator
@@ -78,105 +73,106 @@ function TabsLayout() {
           ios: {
             position: 'absolute',
             height: 80,
-            backgroundColor: 'rgba(6, 6, 6, 0)',
+            backgroundColor: 'rgb(6, 6, 6)',
             borderTopWidth: 0,
-            paddingHorizontal: 25,      // <— minder zijdelingse ruimte
-            justifyContent: 'space-evenly', // <— verdeel items compacter
+            paddingHorizontal: 25,
+            justifyContent: 'space-evenly',
           },
           default: {
             height: 80,
-            backgroundColor: 'rgba(17, 17, 17, 0.81)',
-            paddingHorizontal: 25,      // <— minder zijdelingse ruimte
-            justifyContent: 'space-evenly', // <— verdeel items compacter
+            backgroundColor: 'rgb(17, 17, 17)',
+            paddingHorizontal: 25,
+            justifyContent: 'space-evenly',
           },
         }),
-       
         tabBarItemStyle: {
-             paddingTop: 8,      
+          paddingTop: 8,
+        },
 
-            },
-
-
-             
         tabBarIcon: ({ focused, color }) => {
-          // bepaal de juiste SF-Symbol-naam als string
-          let iconName: string;
+          const opacity = focused ? 1 : 0.8;
           switch (route.name) {
             case 'Feed':
               return (
                 <MaterialCommunityIcons
-                  name={focused ? 'home-variant' : 'home-variant-outline'}
+                  name="home-variant"
                   size={25}
                   color={color}
+                  style={{ opacity }}
                 />
               );
             case 'COLLABS!':
-              iconName = focused
-                ? 'bubble.left.and.bubble.right.fill'
-                : 'bubble.left.and.bubble.right';
-              break;
-              case 'Search':
-                // Outline als inactive, solid Sharp als active
-                return (
-                  <Ionicons
-                    name={focused ? 'search-sharp' : 'search-outline'}
-                    size={25}
-                    color={color}
-                  />
-                );
+              return (
+                <MaterialCommunityIcons
+                  name="chat" // vul hier een bestaand chat icon in
+                  size={25}
+                  color={color}
+                  style={{ opacity }}
+                />
+              );
+            case 'Search':
+              return (
+                <Ionicons
+                  name="search"
+                  size={25}
+                  color={color}
+                  style={{ opacity }}
+                />
+              );
             case 'Profile':
-              iconName = focused
-                ? 'person.crop.circle.fill'
-                : 'person.crop.circle';
-              break;
-              case 'Upload':
-                return (
-                  <View style={[
-                    styles.uploadBubble,
-                    focused && styles.uploadBubbleActive
-                  ]}>
-                    <Ionicons name="add" size={24} color={color} />
-                  </View>
-                );
+              return (
+                <Ionicons
+                  name="person"
+                  size={25}
+                  color={color}
+                  style={{ opacity }}
+                />
+              );
+            case 'Upload':
+              return (
+                <View style={styles.uploadBubble}>
+                  <Ionicons
+                    name="add"
+                    size={24}
+                    color="black"
+                    style={{ opacity }}
+                  />
+                </View>
+              );
             default:
-              iconName = 'questionmark';
+              return null;
           }
-          // cast naar any om de union-type check te omzeilen
-          return <IconSymbol name={iconName as any} size={25} color={color} />;
         },
       })}
     >
       <Tab.Screen
-  name="Feed"
-  component={FeedScreen}
-  options={{
-    headerShown: false,    // ← hieruit halen dat doorzichtig headerje
-
-           }}
-       />
+        name="Feed"
+        component={FeedScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
       <Tab.Screen name="COLLABS!" component={ChatListScreen} />
       <Tab.Screen
-      name="Upload"
-      component={FeedScreen}
-      listeners={({ navigation }) => ({
+        name="Upload"
+        component={FeedScreen}
+        listeners={({ navigation }) => ({
           tabPress: e => {
-          e.preventDefault();                         // voorkom echte tab‐switch
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-          zoom.zoomOut()
-          navigation.navigate('SelectMediaModal');    // open overlay‐modal
-                         },
-  })}                                          // ← sluit hier je listeners af
-/>
+            e.preventDefault();
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+            zoom.zoomOut()
+            navigation.navigate('SelectMediaModal');
+          },
+        })}
+      />
       <Tab.Screen name="Search" component={search} />
-      <Tab.Screen 
-      name="Profile" 
-      options={{headerShown: false}}
-      component={ProfileScreen} />
-  
-      
+      <Tab.Screen
+        name="Profile"
+        options={{ headerShown: false }}
+        component={ProfileScreen}
+      />
     </Tab.Navigator>
   );
-  
 }
 
 // ✅ AppNavigatie met Auth-check
@@ -192,16 +188,12 @@ function AuthNavigator() {
     );
   }
 
-
-  
   return (
     <Stack.Navigator
-    screenOptions={{
-      // alle schermen krijgen zwarte achtergrond onder je animatie
-      cardStyle: { backgroundColor: 'black' },
-    
-    }}>
-      
+      screenOptions={{
+        // alle schermen krijgen zwarte achtergrond onder je animatie
+        cardStyle: { backgroundColor: 'black' },
+      }}>
       {/* ✅ Als GEEN sessie → Toon Login/Register */}
       {!user ? (
         <>
@@ -210,43 +202,38 @@ function AuthNavigator() {
         </>
       ) : (
         <>
-        
-        
           {/* ✅ Als WEL sessie → Toon de hoofdapp */}
-           <Stack.Screen 
-              name="Main" 
-              component={TabsLayout} 
-              options={{ headerShown: false }}
-                                              />
-          
-     
-     
+          <Stack.Screen
+            name="Main"
+            component={TabsLayout}
+            options={{ headerShown: false }}
+          />
+
           {/* 🔔 Overlay-modals bovenop je tabs */}
-         <Stack.Group
-           screenOptions={{
-           presentation: 'transparentModal',
-           cardStyle: { backgroundColor: 'transparent' },
-           
+          <Stack.Group
+            screenOptions={{
+              presentation: 'transparentModal',
+              cardStyle: { backgroundColor: 'transparent' },
             }}
-         >
-           {/* 1) Blur-overlay met gallery-sheet */}
-           <Stack.Screen
+          >
+            {/* 1) Blur-overlay met gallery-sheet */}
+            <Stack.Screen
               name="SelectMediaModal"
               component={SelectMediaScreen}
-              options={{headerShown: false, }}
-           />
+              options={{ headerShown: false }}
+            />
             {/* 2) Fullscreen uploadpagina na selectie */}
             <Stack.Screen
               name="UploadFormModal"
-             component={UploadScreen}
-              options={{ 
-                presentation: 'card', 
-                headerShown: false}}
+              component={UploadScreen}
+              options={{
+                presentation: 'card',
+                headerShown: false
+              }}
             />
           </Stack.Group>
-          
-          <Stack.Screen 
-            name="Chat" 
+          <Stack.Screen
+            name="Chat"
             component={ChatScreen}
             options={{
               headerShown: true,
@@ -256,9 +243,9 @@ function AuthNavigator() {
               headerStyle: { backgroundColor: "rgba(0,0,0,0.8)" },
             }}
           />
-          <Stack.Screen 
-            name="UserProfile" 
-            component={UserProfileScreen} 
+          <Stack.Screen
+            name="UserProfile"
+            component={UserProfileScreen}
             options={{
               headerShown: true,
               headerTitle: "Profile",
@@ -266,30 +253,28 @@ function AuthNavigator() {
               headerStyle: { backgroundColor: "rgba(57, 57, 57, 0.95)" },
             }}
           />
-          <Stack.Screen 
-            name="EditProfile" 
-            component={EditProfile} 
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfile}
             options={{ headerShown: false }} />
-
-          <Stack.Screen 
-            name="uploadProfileMedia" 
-            component={uploadProfileMediaScreen} 
-            options={{ headerShown: false }} 
-          /> 
-
-          <Stack.Screen 
-           name="DemoDetail" 
-           component={demoDetailScreen} 
-           options={{ headerShown: true, headerTitle: "Demo Detail" }} 
-           />
-          <Stack.Screen 
-            name="ArtistTagSelect" 
-            component={ArtistTagSelectScreen} 
+          <Stack.Screen
+            name="uploadProfileMedia"
+            component={uploadProfileMediaScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="DemoDetail"
+            component={demoDetailScreen}
+            options={{ headerShown: true, headerTitle: "Demo Detail" }}
+          />
+          <Stack.Screen
+            name="ArtistTagSelect"
+            component={ArtistTagSelectScreen}
             options={{ headerShown: true, headerTitle: "Profile", headerTintColor: "white" }}
           />
-          <Stack.Screen 
-            name="GenreTagSelect" 
-            component={GenreTagSelectScreen} 
+          <Stack.Screen
+            name="GenreTagSelect"
+            component={GenreTagSelectScreen}
             options={{ headerShown: true, headerTitle: "Tags", headerTintColor: "white" }}
           />
         </>
@@ -300,13 +285,22 @@ function AuthNavigator() {
 
 // ✅ Hoofdexport met AuthProvider
 export default function AppNavigator() {
+  const [fontsLoaded] = useFonts({
+    Manrope_400Regular,
+    Manrope_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <AuthProvider>
       <View style={styles.root}>
-      <ZoomProvider>
-       <StatusBar style="light" backgroundColor="transparent" translucent />
-      <AuthNavigator />
-      </ZoomProvider>
+        <ZoomProvider>
+          <StatusBar style="light" backgroundColor="transparent" translucent />
+          <AuthNavigator />
+        </ZoomProvider>
       </View>
     </AuthProvider>
   );
@@ -331,12 +325,12 @@ const styles = StyleSheet.create({
   uploadBubble: {
     width: 60,
     height: 37,
-    borderRadius: 10,
-    backgroundColor: "#212121",
+    borderRadius: 30,
+    backgroundColor: "#fff",  // Altijd witte bubble
     justifyContent: 'center',
     alignItems: 'center',
   },
   uploadBubbleActive: {
-    backgroundColor: '#333',  // donkergrijs bubble
+    backgroundColor: '#333',  // Niet meer nodig, kan blijven staan als fallback
   },
 });

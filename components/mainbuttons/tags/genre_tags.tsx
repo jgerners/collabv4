@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
         justifyContent: "center", // Centreert de inhoud verticaal
         marginRight: 2,
         backgroundColor: "transparant",
-        paddingHorizontal: 7,
+        paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: 12,
         marginVertical: 4,
@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
       text: {
         fontSize: 11,
         color: "white",
-        fontFamily: "inter",
+        fontFamily: 'Manrope_700Regular', // of 'Manrope_700Bold'
         fontWeight: "bold",
         textAlign: "center",
         textAlignVertical: "center", // Voeg dit toe

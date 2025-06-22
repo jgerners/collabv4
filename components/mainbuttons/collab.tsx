@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Animated, Text, StyleSheet, View } from "react-native";
 import { PanGestureHandler, State } from "react-native-gesture-handler";
 import { supabase } from "../../supabaseClient";
 import { useFonts } from 'expo-font';
+import { BlurView } from 'expo-blur';
 
 interface CollabProps {
   senderId: string;
@@ -14,10 +15,11 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
   const [status, setStatus] = useState<"none" | "pending" | "accepted" | "rejected">("none");
   const [isComplete, setIsComplete] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
-  const [locallyCompleted, setLocallyCompleted] = useState(false); // NEW: Track local completion
+  const [locallyCompleted, setLocallyCompleted] = useState(false);
 
   const [fontsLoaded] = useFonts({
-    'BebasNeue-Regular': require('../../assets/fonts/Manrope-VariableFont_wght.ttf'),
+    'Manrope_400Regular': require('../../assets/fonts/Manrope-VariableFont_wght.ttf'),
+    // 'BebasNeue-Regular': require('../../assets/fonts/BebasNeue-Regular.ttf'), // Alleen als je deze ook wilt
   });
 
   // Animation values
@@ -31,9 +33,9 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
 
   const buttonWidth = 280;
   const handleWidth = 56;
-  const maxTranslate = buttonWidth - handleWidth - 10;
+  const maxTranslate = buttonWidth - 45 - 10; // 45 = nieuwe handle width
 
-  // Your existing Supabase logic - UNCHANGED
+  // Supabase logic - ONGEWIJZIGD
   useEffect(() => {
     const subscription = supabase
       .channel("collab_requests_channel")
@@ -58,7 +60,6 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
     };
   }, [senderId, postId]);
 
-  // Modified database logic - Don't set status immediately
   const handleCollabRequest = async () => {
     if (status === "pending") {
       console.log("Er is al een verzoek in behandeling.");
@@ -82,8 +83,6 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
       console.error("Fout bij verzenden collab request:", error);
       return;
     }
-    // REMOVED: setStatus("pending") - let the subscription handle this
-    // The popup will stay visible until the subscription updates the status
   };
 
   // Arrow animation
@@ -134,45 +133,36 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
     if (status === "none" && !locallyCompleted) {
       animateArrows();
     }
-  }, [status, locallyCompleted]);
+  }, [status, locallyCompleted, arrowOpacity1, arrowOpacity2, arrowOpacity3]);
 
-  // Handle swipe completion - MODIFIED: Track local completion
   const handleSwipeComplete = async () => {
     setIsComplete(true);
     setShowPopup(true);
-    setLocallyCompleted(true); // NEW: Mark as locally completed
+    setLocallyCompleted(true);
 
-    // Animate popup
     Animated.spring(popupScale, {
       toValue: 1,
       useNativeDriver: true,
     }).start();
 
-    // Call your existing database logic
     await handleCollabRequest();
-
-    // Popup stays visible permanently now
   };
 
-  // Gesture handler events
   const onGestureEvent = Animated.event(
     [{ nativeEvent: { translationX: translateX } }],
     { useNativeDriver: true }
   );
 
   const onHandlerStateChange = (event: any) => {
-    // Don't allow gestures if already completed
     if (locallyCompleted) return;
 
     if (event.nativeEvent.state === State.BEGAN) {
-      // Start drag - show blue background
       Animated.timing(blueOpacity, {
         toValue: 1,
         duration: 200,
         useNativeDriver: true,
       }).start();
       
-      // Scale down handle slightly
       Animated.spring(handleScale, {
         toValue: 0.95,
         useNativeDriver: true,
@@ -182,14 +172,12 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
     if (event.nativeEvent.state === State.END) {
       const { translationX } = event.nativeEvent;
       
-      // Scale handle back to normal
       Animated.spring(handleScale, {
         toValue: 1,
         useNativeDriver: true,
       }).start();
       
       if (translationX > maxTranslate ) {
-        // Complete the swipe
         Animated.spring(translateX, {
           toValue: maxTranslate,
           useNativeDriver: true,
@@ -197,7 +185,6 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
           handleSwipeComplete();
         });
       } else {
-        // Bounce back with nice spring animation
         Animated.spring(translateX, {
           toValue: 5,
           tension: 400,
@@ -205,7 +192,6 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
           useNativeDriver: true,
         }).start();
         
-        // Hide blue background
         Animated.timing(blueOpacity, {
           toValue: 0,
           duration: 200,
@@ -219,24 +205,24 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
     return null;
   }
 
-  // MODIFIED: Show status container only if NOT locally completed
-  // If locally completed, show the swiper with popup instead
+  // Status/blur melding
   if (status !== "none" && !locallyCompleted) {
     return (
-      <View style={styles.statusContainer}>
+      <BlurView intensity={50} tint="light" style={styles.statusContainer}>
         <Text style={styles.statusText}>
           {status === "pending" ? "Request Sent" : 
-           status === "accepted" ? "Accepted!" : 
-           status === "rejected" ? "Declined" : "COLLAB!"}
+            status === "accepted" ? "Accepted!" : 
+            status === "rejected" ? "Declined" : "COLLAB!"}
         </Text>
-      </View>
+      </BlurView>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.track}>
-        {/* Blue background that smoothly follows from the left */}
+      {/* BlurView als track background */}
+      <BlurView intensity={40} tint="light" style={styles.track}>
+        {/* Paarse background animatie */}
         <View style={styles.blueContainer}>
           <Animated.View
             style={[
@@ -244,10 +230,7 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
               {
                 opacity: blueOpacity,
                 transform: [
-                  // 1) schuif de pivot 1/2 breedte naar links
                   { translateX: -buttonWidth / 2 },
-
-                  // 2) scaleX van 0→1 over de volle breedte
                   {
                     scaleX: translateX.interpolate({
                       inputRange: [0, maxTranslate],
@@ -255,8 +238,6 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
                       extrapolate: 'clamp',
                     }),
                   },
-
-                  // 3) schuif de pivot weer 1/2 breedte naar rechts
                   { translateX: buttonWidth / 2 },
                 ],
               },
@@ -271,7 +252,7 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
           </View>
         )}
 
-        {/* Animated arrows - Hide when completed */}
+        {/* Animated arrows */}
         {!locallyCompleted && (
           <View style={styles.arrowContainer}>
             <Animated.Text style={[styles.arrow, { opacity: arrowOpacity1 }]}>
@@ -286,7 +267,7 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
           </View>
         )}
 
-        {/* Draggable handle with gesture handler */}
+        {/* Draggable handle */}
         <PanGestureHandler
           onGestureEvent={onGestureEvent}
           onHandlerStateChange={onHandlerStateChange}
@@ -313,21 +294,21 @@ const Collab: React.FC<CollabProps> = ({ senderId, receiverId, postId }) => {
             )}
           </Animated.View>
         </PanGestureHandler>
-      </View>
 
-      {/* Success popup - Now stays visible permanently after completion */}
-      {showPopup && (
-        <Animated.View
-          style={[
-            styles.popup,
-            {
-              transform: [{ scale: popupScale }],
-            },
-          ]}
-        >
-          <Text style={styles.popupText}>✓ COLLAB! sent</Text>
-        </Animated.View>
-      )}
+        {/* Success popup */}
+        {showPopup && (
+          <Animated.View
+            style={[
+              styles.popup,
+              {
+                transform: [{ scale: popupScale }],
+              },
+            ]}
+          >
+            <Text style={styles.popupText}>✓ COLLAB! sent</Text>
+          </Animated.View>
+        )}
+      </BlurView>
     </View>
   );
 };
@@ -340,10 +321,10 @@ const styles = StyleSheet.create({
   track: {
     width: 280,
     height: 56,
-    backgroundColor: 'rgba(130, 130, 130, 0.35)',
     borderRadius: 28,
     position: 'relative',
     overflow: 'hidden',
+    // Geen backgroundColor! BlurView regelt dit.
   },
   blueContainer: {
     position: 'absolute',
@@ -351,16 +332,14 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     right: 0,
-    alignItems: 'flex-start', // Align to left
+    alignItems: 'flex-start',
     justifyContent: 'center',
-    
   },
   blueBackground: {
-    width: 280, // Full width
+    width: 280,
     height: 56,
-    backgroundColor: '#0066ff',
+    backgroundColor: '#4800FF', // Paarse tint
     borderRadius: 28,
-    
   },
   textContainer: {
     position: 'absolute',
@@ -373,9 +352,8 @@ const styles = StyleSheet.create({
   },
   swipeText: {
     color: 'white',
+    fontFamily: 'Manrope_400Regular', // Let op: zorg dat je deze font laadt!
     fontSize: 12,
-    fontWeight: '500',
-    fontFamily: 'inter',
   },
   arrowContainer: {
     position: 'absolute',
@@ -394,9 +372,9 @@ const styles = StyleSheet.create({
   handle: {
     position: 'absolute',
     left: 5,
-    top: 6,
-    width: 56,
-    height: 44,
+    top: 9,
+    width: 45,
+    height: 38,
     backgroundColor: 'white',
     borderRadius: 22,
     alignItems: 'center',
@@ -421,7 +399,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#0066ff',
+    backgroundColor: '#4800FF',
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
@@ -438,21 +416,19 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
-    fontFamily: 'BebasNeue-Regular',
+    // fontFamily: 'BebasNeue-Regular', // optioneel
   },
   statusContainer: {
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 12,
-    backgroundColor: '#4800FF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    // backgroundColor: '#4800FF', // Niet nodig, BlurView zorgt voor blur
   },
   statusText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
-    fontFamily: 'BebasNeue-Regular',
+    // fontFamily: 'BebasNeue-Regular', // optioneel
   },
 });
 
