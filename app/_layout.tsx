@@ -41,6 +41,11 @@ import LoginScreen from "./auth/login"; // ✅ Login
 import RegisterScreen from "./auth/register"; // ✅ Register
 import uploadProfileMediaScreen from "./screens/uploadProfileMediaScreen"; // ✅ Register
 import demoDetailScreen from './screens/demoDetailScreen';
+import PostDetailScreen from "./screens/PostDetailScreen"; // of je juiste pad!
+
+import PostStack from './PostStack'; // Pas het pad aan naar waar je PostStack.tsx hebt opgeslagen!
+
+
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -146,12 +151,13 @@ function TabsLayout() {
       })}
     >
       <Tab.Screen
-        name="Feed"
-        component={FeedScreen}
-        options={{
-          headerShown: false,
-        }}
-      />
+  name="Feed"
+  component={PostStack}
+  options={{
+    headerShown: false,
+  }}
+/>
+
       <Tab.Screen name="COLLABS!" component={ChatListScreen} />
       <Tab.Screen
         name="Upload"
@@ -277,6 +283,14 @@ function AuthNavigator() {
             component={GenreTagSelectScreen}
             options={{ headerShown: true, headerTitle: "Tags", headerTintColor: "white" }}
           />
+          <Stack.Screen
+           name="PostDetail"
+           component={PostDetailScreen}
+           options={{
+           headerShown: false, // Want je hebt zelf een custom pijl in de screen
+                                                        }}
+/>
+
         </>
       )}
     </Stack.Navigator>

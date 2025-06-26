@@ -1,27 +1,33 @@
-// FeedScreen.tsx
 import React, { useRef, useState, useEffect } from "react";
 import {
   View,
-  FlatList,
   StyleSheet,
   Text,
   Dimensions,
-  RefreshControl,
   ActivityIndicator,
 } from "react-native";
-import { useIsFocused } from "@react-navigation/native";
-import PostComponent from "../../components/postcomponent";
+import { useNavigation } from "@react-navigation/native";
 import { useArtistTags } from "../../hooks/useArtistTags";
 import { useGenreTags } from "../../hooks/useGenreTags";
-import { usePosts } from "../../hooks/useFeedPosts"; // De hook met batch loading (PAGE_SIZE = 20)
-import { ActivePostProvider, useActivePost } from "../../context/activePostContext";
+import { usePosts } from "../../hooks/useFeedPosts";
+import { ActivePostProvider } from "../../context/activePostContext";
 import { Audio } from "expo-av";
 import { setCachedAudio } from "../../helpers/audioCache";
-import FeedHeader from "../../headers/FeedHeader"; // Jouw nieuwe header component
+import FeedHeader from "../../headers/FeedHeader";
+import PostPreview from "../../components/PostPreview";
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../routes';
+import MasonryList from "@react-native-seoul/masonry-list";
+import type { PostData, ArtistTagData, GenreTagData } from '../../components/postcomponent';
 
-const { width: windowWidth, height: windowHeight } = Dimensions.get("window");
-// Één item = volledige device-hoogte
-const itemLength = 780;
+type Post = PostData;
+
+const { width: windowWidth } = Dimensions.get("window");
+const CARD_MARGIN = 7;
+const CARD_COLUMNS = 2;
+const CARD_WIDTH = (windowWidth - CARD_MARGIN * (CARD_COLUMNS + 1)) / CARD_COLUMNS;
+
+type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 const FeedScreenContent: React.FC = () => {
   const {
@@ -32,26 +38,18 @@ const FeedScreenContent: React.FC = () => {
     refetch,
     loadMorePosts,
   } = usePosts();
-  const { activePostId, setActivePostId } = useActivePost();
-  const {
-    artistTags,
-    loading: artistLoading,
-    error: artistError,
-  } = useArtistTags();
-  const {
-    genreTags,
-    loading: genreLoading,
-    error: genreError,
-  } = useGenreTags();
+
+  // HIER DESTRUCTURE JE JE TAGS!
+  const { artistTags: allArtistTags = [], error: artistError } = useArtistTags();
+  const { genreTags: allGenreTags = [], error: genreError } = useGenreTags();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState(1); // 0=Friends,1=Feed,2=Filters
+  const [activeTab, setActiveTab] = useState(1);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const navigation = useNavigation<NavigationProp>();
 
-  const isFocused = useIsFocused();
+  // Preload
   const preloadedPosts = useRef<{ [key: string]: boolean }>({});
-  const flatListRef = useRef<FlatList>(null);
-
-  // Preload media
   useEffect(() => {
     posts.forEach((post) => {
       if (!preloadedPosts.current[post.id]) {
@@ -77,41 +75,7 @@ const FeedScreenContent: React.FC = () => {
     });
   }, [posts]);
 
-  // Stel eerste post in als actief
-  useEffect(() => {
-    if (posts.length > 0 && activePostId === null) {
-      setActivePostId(posts[0].id);
-    }
-  }, [posts, activePostId]);
-
-  const activeIndex = posts.findIndex((p) => p.id === activePostId);
-
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: any[] }) => {
-      if (viewableItems.length > 0) {
-        setActivePostId(viewableItems[0].item.id);
-      }
-    }
-  ).current;
-
-  const handleEndReached = () => {
-    if (!loadingMore) loadMorePosts();
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  };
-
-  const onMomentumScrollEnd = ({ nativeEvent }: any) => {
-    const offsetY = nativeEvent.contentOffset.y;
-    console.log("Scroll offset:", offsetY);
-    const index = Math.round(offsetY / itemLength);
-    console.log("Current index:", index);
-  };
-
-  // initial loading
+  // Loading & error
   if (initialLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
@@ -119,8 +83,6 @@ const FeedScreenContent: React.FC = () => {
       </View>
     );
   }
-
-  // foutmelding
   if (error || artistError || genreError) {
     return (
       <View style={styles.container}>
@@ -131,75 +93,106 @@ const FeedScreenContent: React.FC = () => {
     );
   }
 
+  // Refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
+
+  const handlePlay = (id: string) => setPlayingId(id);
+  const handlePause = (id: string) => {
+    if (playingId === id) setPlayingId(null);
+  };
+
+  // DIT IS JE NIEUWE handleSeePost!
+  const handleSeePost = (
+    post: PostData,
+    artistTags: ArtistTagData[],
+    genreTags: GenreTagData[]
+  ) => {
+    navigation.navigate("PostDetail", {
+      postId: post.id,
+      post,
+      artistTags,
+      genreTags,
+    });
+  };
+
   return (
     <View style={styles.container}>
-      {/* Header */}
       <FeedHeader onTabChange={setActiveTab} />
-
-      {/* CONTENT TABS */}
       <View style={styles.tabWrapper}>
-        {/* Friends */}
+        {/* Friends-tab */}
         <View style={[styles.tabContent, { display: activeTab === 0 ? "flex" : "none" }]}>
           <View style={styles.placeholder}>
             <Text style={styles.placeholderText}>Friends-pagina komt hier</Text>
           </View>
         </View>
-
-        {/* Feed */}
+        {/* Feed-tab: MASONRY */}
         <View style={[styles.tabContent, { display: activeTab === 1 ? "flex" : "none" }]}>
-        <FlatList
-  ref={flatListRef}
-  data={posts}
-  keyExtractor={(item) => item.id}
-  renderItem={({ item, index }) => {
-    const isWithinPreloadRange = Math.abs(index - activeIndex) <= 4;
-    return (
-      <PostComponent
-        post={{
-          ...item,
-          timestamp: item.timestamp.toString(),
-          like_count: item.like_count,
-          save_count: item.save_count,
-          follower_count: item.follower_count,
-          isLiked: item.isLiked,
-          isSaved: item.isSaved,
-          isFollowed: item.isFollowed,
-        }}
-        isActive={activePostId === item.id}
-        artistTags={artistTags}
-        genreTags={genreTags}
-        feedFocused={isFocused && activeTab === 1}
-        withinPreloadRange={isWithinPreloadRange}
-      />
-    );
-  }}
-  decelerationRate={0.9935} // Adjusted for smoother scrolling
-  snapToAlignment="start"
-  showsVerticalScrollIndicator={false}
-  getItemLayout={(_, idx) => ({ length: itemLength, offset: itemLength * idx, index: idx })}
-  snapToInterval={itemLength}
-  pagingEnabled
-  disableIntervalMomentum
-  onViewableItemsChanged={onViewableItemsChanged}
-  viewabilityConfig={{ itemVisiblePercentThreshold: 70 }}
-  onEndReached={handleEndReached}
-  onEndReachedThreshold={0.1}
-  ListFooterComponent={
-    loadingMore ? (
-      <View style={styles.footer}>
-        <ActivityIndicator size="small" color="white" />
-        <Text style={{ color: "white", marginTop: 5 }}>Laden...</Text>
-      </View>
-    ) : null
-  }
-  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-  onMomentumScrollEnd={onMomentumScrollEnd} // Attach the handler here
- 
-  
-/>
-        </View>
+          <MasonryList
+            showsVerticalScrollIndicator={false}
+            data={posts}
+            keyExtractor={(item) => (item as Post).id}
+            numColumns={2}
+            style={{ backgroundColor: "black" }}
+            contentContainerStyle={{
+              paddingBottom: 80,
+            }}
+            renderItem={({ item, i }) => {
+              const post = item as PostData;
+              const isLeftCol = i % 2 === 0;
 
-        {/* Filters */}
+              // Per post juiste tags!
+              const artistTagsForPost = allArtistTags.filter(tag =>
+                post.artistTags?.includes(tag.id)
+              );
+              const genreTagsForPost = allGenreTags.filter(tag =>
+                post.genreTags?.includes(tag.id)
+              );
+
+              return (
+                <View
+                  style={{
+                    width: CARD_WIDTH,
+                    marginBottom: CARD_MARGIN,
+                    marginLeft: isLeftCol ? CARD_MARGIN : CARD_MARGIN / 2,
+                    marginRight: isLeftCol ? CARD_MARGIN / 2 : CARD_MARGIN,
+                  }}
+                >
+                  <PostPreview
+                    post={{
+                      ...post,
+                      timestamp: post.timestamp.toString(),
+                    } as PostData}
+                    isPlaying={playingId === post.id}
+                    onPlay={handlePlay}
+                    onPause={handlePause}
+                    onSeePost={() => handleSeePost(
+                      post,
+                      artistTagsForPost,
+                      genreTagsForPost
+                    )}
+                  />
+                </View>
+              );
+            }}
+            onEndReached={loadMorePosts}
+            onEndReachedThreshold={0.12}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            ListFooterComponent={
+              loadingMore ? (
+                <View style={styles.footer}>
+                  <ActivityIndicator size="small" color="white" />
+                  <Text style={{ color: "white", marginTop: 5 }}>Laden...</Text>
+                </View>
+              ) : null
+            }
+          />
+        </View>
+        {/* Filters-tab */}
         <View style={[styles.tabContent, { display: activeTab === 2 ? "flex" : "none" }]}>
           <View style={styles.placeholder}>
             <Text style={styles.placeholderText}>Filters-pagina komt hier</Text>
@@ -214,15 +207,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "black" },
   loadingContainer: { justifyContent: "center", alignItems: "center" },
   footer: { paddingVertical: 20, alignItems: "center" },
-
-  // wrapper rondom alle tab-content
-  tabWrapper: { flex: 1}, 
-
-  tabContent: {
-    flex: 1,
-
-  },
-
+  tabWrapper: { flex: 1 },
+  tabContent: { flex: 1 },
   placeholder: { flex: 1, justifyContent: "center", alignItems: "center" },
   placeholderText: { color: "#888", fontSize: 18 },
 });

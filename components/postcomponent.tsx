@@ -20,6 +20,9 @@ import Slider from "@react-native-community/slider"
 import { setCurrentPlayingMedia } from "../PlaybackManager"
 import { Svg, Path } from "react-native-svg"
 
+import { SharedElement } from "react-navigation-shared-element";
+
+
 import Collab from "./mainbuttons/collab";
 import MoreOptions from "./mainbuttons/moreOptions"; // check je pad!
 import ArtistTag from "./mainbuttons/tags/artist_tags";
@@ -87,6 +90,8 @@ export interface PostData {
   isFollowed: boolean
   isSaved: boolean
   isPlaying?: boolean
+   mediaWidth?: number;
+  mediaHeight?: number;
 }
 
 interface PostProps {
@@ -447,6 +452,7 @@ useEffect(() => {
 
 
       <Pressable onPress={handlePlayPause}>
+        <SharedElement id={`post-media-${post.id}`}>
         {post.mediaType === "video" ? (
           <Video
             ref={videoRef}
@@ -460,6 +466,7 @@ useEffect(() => {
         ) : (
           <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
         )}
+        </SharedElement>
         {/* Play icon overlay when paused */}
         {!isPlaying && manualPaused && (
           <View style={styles.playIconOverlay}>
