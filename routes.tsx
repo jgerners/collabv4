@@ -1,7 +1,4 @@
 // routes.tsx
-
-import type { PostData, ArtistTagData, GenreTagData } from "./components/postcomponent";
-
 export type RootStackParamList = {
     Main: { screen?: string } | undefined;
     UserProfile: { userId: string };
@@ -26,12 +23,7 @@ export type RootStackParamList = {
     uploadProfileMedia: undefined;
 
     DemoDetail: { demoId: string }; // Voeg dit toe
-      PostDetail: {
-  postId: string,
-  post: PostData,
-  artistTags: ArtistTagData[],
-  genreTags: GenreTagData[]
-}
+
    
     
   };

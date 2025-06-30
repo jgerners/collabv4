@@ -1,60 +1,40 @@
-"use client"
-
-import type React from "react"
-import { useRef, useState, useEffect } from "react"
+import React, { useRef, useState, useEffect } from "react"
 import {
-  Animated,
   View,
   Text,
   Image,
   Pressable,
   StyleSheet,
-  Dimensions,
-  UIManager,
-  Platform,
   TouchableOpacity,
+  Dimensions,
+  ScrollView,
 } from "react-native"
 import { Video, ResizeMode, Audio } from "expo-av"
-import { useAuth } from "../context/authContext"
 import Slider from "@react-native-community/slider"
-import { setCurrentPlayingMedia } from "../PlaybackManager"
 import { Svg, Path } from "react-native-svg"
 
-import { SharedElement } from "react-navigation-shared-element";
-
-
-import Collab from "./mainbuttons/collab";
-import MoreOptions from "./mainbuttons/moreOptions"; // check je pad!
-import ArtistTag from "./mainbuttons/tags/artist_tags";
-import GenreTag from "./mainbuttons/tags/genre_tags";
-import Description from "./mainbuttons/description";
-import Title from "./mainbuttons/title"; // pas het pad aan naar jouw structuur!
-import ProfileLink from "./profileLink"; // Let op: pad aanpassen indien nodig!
-import WaveForm from "./mainbuttons/waveForm"; // pas het pad aan als nodig
-
-
-
-
-
-
-
-
-
+import { useAuth } from "../context/authContext"
 import { useLike } from "../hooks/useLike"
 import { useSave } from "../hooks/useSave"
 import { useFollow } from "../hooks/useFollow"
 import { useUserProfile } from "../hooks/useUserProfile"
 import { useFonts } from "expo-font"
 import { getCachedAudio, setCachedAudio } from "../helpers/audioCache"
+import { setCurrentPlayingMedia } from "../PlaybackManager"
 
-import ReplayButton from "./mainbuttons/replay"
+import Collab from "./mainbuttons/collab";
+import ArtistTag from "./mainbuttons/tags/artist_tags";
+import GenreTag from "./mainbuttons/tags/genre_tags";
+import Description from "./mainbuttons/description";
+import Title from "./mainbuttons/title";
+import ReplayButton from "./mainbuttons/replay";
 
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true)
-}
-
-const { width: windowWidth, height: windowHeight } = Dimensions.get("window")
-const scale = windowWidth / 370
+// ==== DESIGN CONSTANTS ====
+const H_MARGIN = 16;        // horizontale margin buitenom
+const MEDIA_SIZE = 170;     // media is 170x170 (extra breed)
+const INFO_WIDTH = 130;     // info bubble smaller
+const BUBBLE_HEIGHT = 170;  // alles even hoog
+const BUBBLE_RADIUS = 16;
 
 export interface ArtistTagData {
   id: string
@@ -90,8 +70,6 @@ export interface PostData {
   isFollowed: boolean
   isSaved: boolean
   isPlaying?: boolean
-   mediaWidth?: number;
-  mediaHeight?: number;
 }
 
 interface PostProps {
@@ -101,6 +79,8 @@ interface PostProps {
   isActive: boolean
   feedFocused: boolean
   withinPreloadRange: boolean
+  expanded: boolean
+  onExpand: () => void
 }
 
 const formatTime = (ms: number) => {
@@ -112,48 +92,20 @@ const formatTime = (ms: number) => {
 
 const PostComponent: React.FC<PostProps> = ({
   post,
-  isActive,
   artistTags,
   genreTags,
+  isActive,
   feedFocused,
   withinPreloadRange,
+  expanded,
+  onExpand
 }) => {
   const { user } = useAuth()
   const currentUserId = user?.id
-  const {
-    liked,
-    likeCount,
-    formatCount,
-    loading: likeLoading,
-    toggleLike,
-  } = useLike({
-    userId: currentUserId!,
-    postId: post.id,
-    receiverId: post.userId,
-    initialCount: post.like_count,
-  })
-  const {
-    saved,
-    saveCount,
-    loading: saveLoading,
-    toggleSave,
-  } = useSave({
-    userId: currentUserId!,
-    postId: post.id,
-    initialCount: post.save_count,
-  })
-  const {
-    isFollowing,
-    followCount,
-    loading: followLoading,
-    toggleFollow,
-  } = useFollow({
-    followerId: currentUserId!,
-    followingId: post.userId,
-    initialCount: post.follower_count,
-  })
-
-  const { profile, loading: profileLoading, error: profileError } = useUserProfile(post.userId)
+  const { liked, likeCount, toggleLike } = useLike({ userId: currentUserId!, postId: post.id, receiverId: post.userId, initialCount: post.like_count });
+  const { saved, toggleSave } = useSave({ userId: currentUserId!, postId: post.id, initialCount: post.save_count });
+  const { isFollowing, toggleFollow } = useFollow({ followerId: currentUserId!, followingId: post.userId, initialCount: post.follower_count });
+  const { profile } = useUserProfile(post.userId)
 
   const [fontsLoaded] = useFonts({
     "Manrope": require("../assets/fonts/Manrope-VariableFont_wght.ttf"),
@@ -162,39 +114,18 @@ const PostComponent: React.FC<PostProps> = ({
   const [isPlaying, setIsPlaying] = useState(false)
   const [manualPaused, setManualPaused] = useState(false)
   const [audioLoading, setAudioLoading] = useState(false)
-
   const videoRef = useRef<Video | null>(null)
   const audioRef = useRef<Audio.Sound | null>(null)
-
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [animatedTime, setAnimatedTime] = useState(0);
 
-
-  const awaitOrIgnore = async (fn: () => Promise<any>) => {
-    try {
-      await fn()
-    } catch (error) {}
-  }
-
+  const awaitOrIgnore = async (fn: () => Promise<any>) => { try { await fn() } catch (error) {} }
   const updatePlaybackStatus = (status: any) => {
     if (status.isLoaded) {
       setCurrentTime(status.positionMillis)
-       setAnimatedTime(status.positionMillis); // <- voeg deze toe!
+      setAnimatedTime(status.positionMillis)
       setDuration(status.durationMillis)
-    }
-  }
-
-  const retryPlayAudio = async (sound: Audio.Sound, retries = 3): Promise<void> => {
-    for (let i = 0; i < retries; i++) {
-      try {
-        const status = await sound.getStatusAsync()
-        if (status.isLoaded) {
-          await sound.playAsync()
-          return
-        }
-      } catch (error) {}
-      await new Promise((resolve) => setTimeout(resolve, 300))
     }
   }
 
@@ -211,9 +142,7 @@ const PostComponent: React.FC<PostProps> = ({
           setCachedAudio(post.id, sound)
           sound.setOnPlaybackStatusUpdate(updatePlaybackStatus)
         } else {
-          if (reset) {
-            await sound.setPositionAsync(0)
-          }
+          if (reset) await sound.setPositionAsync(0)
           sound.setOnPlaybackStatusUpdate(updatePlaybackStatus)
           await sound.playAsync()
         }
@@ -225,9 +154,7 @@ const PostComponent: React.FC<PostProps> = ({
       }
       audioRef.current = sound
       setIsPlaying(true)
-    } catch (error) {
-      console.error("Fout bij het laden van audio:", error)
-    }
+    } catch (error) { console.error("Fout bij audio:", error) }
     setAudioLoading(false)
   }
 
@@ -247,14 +174,7 @@ const PostComponent: React.FC<PostProps> = ({
           setIsPlaying(true)
           setManualPaused(false)
         } else if (post.mediaType === "photo" && post.audio) {
-          const sound = getCachedAudio(post.id)
-          if (sound) {
-            const status = await sound.getStatusAsync()
-            const shouldReset = status.isLoaded ? status.positionMillis === 0 : true
-            await playAudio(shouldReset)
-          } else {
-            await playAudio(true)
-          }
+          await playAudio(true)
           setManualPaused(false)
         }
         hasAutoPlayedRef.current = true
@@ -288,6 +208,11 @@ const PostComponent: React.FC<PostProps> = ({
     managePlayback()
   }, [isActive, feedFocused])
 
+  const handleExpandAndPlay = async () => {
+    onExpand();
+    await handlePlayPause();
+  }
+
   const handlePlayPause = async () => {
     if (post.mediaType === "video" && videoRef.current) {
       if (isPlaying) {
@@ -316,7 +241,7 @@ const PostComponent: React.FC<PostProps> = ({
 
   const handleSlidingComplete = async (value: number) => {
     const newPosition = value * duration
-    setAnimatedTime(newPosition); // direct visueel syncen!
+    setAnimatedTime(newPosition)
     if (post.mediaType === "video" && videoRef.current) {
       await videoRef.current.setPositionAsync(newPosition)
     } else if (post.mediaType === "photo" && post.audio && audioRef.current) {
@@ -352,357 +277,287 @@ const PostComponent: React.FC<PostProps> = ({
     }
   }, [])
 
-useEffect(() => {
-  let raf: number | undefined;
-  let prev = Date.now();
-
-  function animate() {
-    if (isPlaying && duration > 0) {
-      const now = performance.now();
-      const elapsed = now - prev;
-      prev = now;
-      setAnimatedTime((prevTime) => {
-        let next = prevTime + elapsed;
-        return next > duration ? duration : next;
-      });
+  useEffect(() => {
+    let raf: number | undefined;
+    let prev = Date.now();
+    function animate() {
+      if (isPlaying && duration > 0) {
+        const now = performance.now();
+        const elapsed = now - prev;
+        prev = now;
+        setAnimatedTime((prevTime) => {
+          let next = prevTime + elapsed;
+          return next > duration ? duration : next;
+        });
+        raf = requestAnimationFrame(animate);
+      }
+    }
+    if (isPlaying) {
+      prev = performance.now();
       raf = requestAnimationFrame(animate);
     }
-  }
+    return () => { if (raf !== undefined) cancelAnimationFrame(raf); };
+  }, [isPlaying, duration]);
 
-  if (isPlaying) {
-    prev = performance.now();
-    raf = requestAnimationFrame(animate);
-  }
-  return () => {
-    if (raf !== undefined) cancelAnimationFrame(raf);
-  };
-}, [isPlaying, duration]);
-
-
-
-
-  // ---- MEDIA-ONLY JSX ----
   return (
-  <View style={styles.fullScreen}>
-    <View style={styles.mediaContainer}>
-     <View style={styles.displayNameRoleOverlay}>
-    <Text style={styles.displayNameRoleText}>
-      {post.display_name} · {post.role}
-    </Text>
-  </View>
-
-   {/* Rechtsboven: MoreOptions */}
-  <TouchableOpacity style={styles.moreOptionsOverlay}>
-  <MoreOptions />
-</TouchableOpacity>
-
-
-
-
-{/* profielfoto,username,titel, beschrijving en waveform */}
-  <View style={styles.midoverlay}>
-    <View style={styles.profileRow}>
-  {/* Links: profielfoto + username samen */}
-  <View style={{ flexDirection: "row", alignItems: "center" }}>
-    <ProfileLink userId={post.userId}>
-      <Image source={{ uri: post.profileImage }} style={styles.profilePic} />
-    </ProfileLink>
-    <ProfileLink userId={post.userId}>
-      <Text style={styles.profileUsername}>{post.username.toLowerCase()}</Text>
-    </ProfileLink>
-  </View>
-  {/* Rechts: waveform */}
-  <WaveForm style={styles.waveForm} />
-</View>
-
-    <Title title={post.title} maxLines={2} textStyle={{ marginBottom: scale * 5 }} />
-    <Description description={post.description} maxLines={2} />
-  </View>
-
-
-
-
-
-{/* TAGS - OVERLAY */}
-  <View style={styles.tagsBar}>
-    <View style={styles.artistTagsRow}>
-      {post.artistTags?.map((tagId, idx) => {
-        const tag = artistTags.find(t => t.id === tagId);
-        if (!tag) return null;
-        return (
-          <View key={tag.id} style={[
-            styles.artistTagBubble,
-            idx !== 0 && { marginLeft: -scale * 8 } // overlap effect!
-          ]}>
-            <ArtistTag id={tag.id} name={tag.name} image={tag.image} />
-          </View>
-        );
-      })}
-    </View>
-    <View style={styles.genreTagsRow}>
-      {post.genreTags?.map((tagId) => {
-        const tag = genreTags.find(t => t.id === tagId);
-        if (!tag) return null;
-        return (
-          <GenreTag key={tag.id} id={tag.id} name={tag.name} />
-        );
-      })}
-    </View>
-  </View>
-
-
-      <Pressable onPress={handlePlayPause}>
-        <SharedElement id={`post-media-${post.id}`}>
-        {post.mediaType === "video" ? (
-          <Video
-            ref={videoRef}
-            source={{ uri: post.mediaUrl as string }}
-            style={styles.media}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay={false}
-            isLooping
-            useNativeControls={false}
-          />
-        ) : (
-          <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
-        )}
-        </SharedElement>
-        {/* Play icon overlay when paused */}
-        {!isPlaying && manualPaused && (
-          <View style={styles.playIconOverlay}>
-            <Svg width={50} height={50} viewBox="0 0 24 24" fill="none">
-              <Path
-                d="M8 5.14v14l11-7-11-7z"
-                fill="white"
-                stroke="white"
-                strokeWidth={1.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </Svg>
-          </View>
-        )}
-
-
-        
-        {/* Controls */}
-        <View style={styles.controlsContainer}>
-          {/* Current time */}
-          <View style={styles.timeLabelCurrent}>
-            <Text style={styles.timeText}>{formatTime(animatedTime)}</Text>
-          </View>
-          {/* Slider */}
-          <View style={styles.seekbarContainer}>
-            <Slider
-              style={{ width: scale * 250, transform: [{ scaleY: 1.5,  }] }}
-              minimumValue={0}
-              maximumValue={1}
-              value={duration ? animatedTime / duration : 0}
-              minimumTrackTintColor="#FFFFFF"
-              maximumTrackTintColor="#000000"
-              thumbTintColor="#FFFFFF00"
-              onSlidingComplete={handleSlidingComplete}
+    <View style={{ marginBottom: expanded ? 28 : 16, marginHorizontal: H_MARGIN }}>
+      <View style={styles.rowPressable}>
+        {/* MEDIA BUBBLE */}
+        <Pressable
+          style={[styles.mediaBubble, { width: MEDIA_SIZE, height: BUBBLE_HEIGHT }]}
+          onPress={handleExpandAndPlay}
+        >
+          {post.mediaType === "video" ? (
+            <Video
+              ref={videoRef}
+              source={{ uri: post.mediaUrl as string }}
+              style={styles.media}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay={false}
+              isLooping
+              useNativeControls={false}
             />
+          ) : (
+            <Image source={{ uri: post.mediaUrl as string }} style={styles.media} />
+          )}
+          <TouchableOpacity
+            style={styles.playIconOverlay}
+            onPress={handlePlayPause}
+            activeOpacity={0.7}
+          >
+            {!isPlaying ? (
+              <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+                <Path d="M8 5.14v14l11-7-11-7z" fill="white" />
+              </Svg>
+            ) : (
+              <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+                <Path d="M6 5h4v14H6zM14 5h4v14h-4z" fill="white" />
+              </Svg>
+            )}
+          </TouchableOpacity>
+        </Pressable>
+        {/* INFO BUBBLE */}
+        <Pressable
+          style={[
+            styles.infoBubble,
+            {
+              width: INFO_WIDTH,
+              height: BUBBLE_HEIGHT,
+              backgroundColor: "#101014",
+              justifyContent: "flex-start",
+            }
+          ]}
+          onPress={handleExpandAndPlay}
+        >
+          <View style={{ flex: 1, justifyContent: "flex-start" }}>
+            {/* Username + profielfoto rechts */}
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 3 }}>
+              <Text style={styles.profileUsername} numberOfLines={1} ellipsizeMode="tail">{post.username}</Text>
+              <Image source={{ uri: post.profileImage }} style={styles.profilePic} />
+            </View>
+            {/* Role */}
+            <Text style={styles.roleText} numberOfLines={1}>{post.role}</Text>
+            {/* Titel */}
+            <Title
+              title={post.title}
+              maxLines={2}
+              textStyle={styles.titleText}
+            />
+            {/* Beschrijving */}
+            <Description description={post.description} maxLines={2} textStyle={styles.descriptionText} />
+            {/* TAGS */}
+            <View style={{ minHeight: 22, marginTop: 2, marginBottom: 8 }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.tagsScrollRow}
+                style={{ marginBottom: 0 }}
+              >
+                {post.artistTags?.map((tagId) => {
+                  const tag = artistTags.find(t => t.id === tagId);
+                  if (!tag) return null;
+                  return (
+                    <View key={tag.id} style={styles.artistTagBubble}>
+                      <ArtistTag id={tag.id} name={tag.name} image={tag.image} />
+                    </View>
+                  );
+                })}
+                {post.genreTags.map((tagId) => {
+                  const tag = genreTags.find(t => t.id === tagId);
+                  return tag ? (
+                    <View key={tag.id} style={styles.tagBubble}>
+                      <Text style={{ color: '#fff', fontSize: 9 }}>{tag.name}</Text>
+                    </View>
+                  ) : null;
+                })}
+              </ScrollView>
+            </View>
+            {/* SEEK BAR */}
+            <View style={styles.seekbarRow}>
+              <Text style={styles.seekbarTimeText}>{formatTime(animatedTime)}</Text>
+              <Slider
+                style={styles.seekbar}
+                minimumValue={0}
+                maximumValue={1}
+                value={duration ? animatedTime / duration : 0}
+                minimumTrackTintColor="#FFF"
+                maximumTrackTintColor="#555"
+                thumbTintColor="transparent"
+                onSlidingComplete={handleSlidingComplete}
+              />
+              <Text style={styles.seekbarTimeText}>-{formatTime(duration - animatedTime)}</Text>
+              <ReplayButton onPress={handleReplay} />
+            </View>
           </View>
-          {/* Remaining time */}
-          <View style={styles.timeLabelRemaining}>
-            <Text style={styles.timeText}>-{formatTime(duration - animatedTime)}</Text>
+        </Pressable>
+      </View>
+      {/* UITKLAPPENDE KNOPPEN */}
+      {expanded && (
+        <View style={styles.expandedRow}>
+          {/* Save knop */}
+          <View style={{ width: MEDIA_SIZE, alignItems: "center" }}>
+            <TouchableOpacity style={styles.saveButton} onPress={toggleSave} activeOpacity={0.85}>
+              <Text style={styles.saveButtonText}>{saved ? "Saved" : "Save"}</Text>
+            </TouchableOpacity>
           </View>
-          {/* Replay button */}
-          <ReplayButton onPress={handleReplay} />
+          {/* Collab knop */}
+          <View style={{ width: INFO_WIDTH, alignItems: "center", paddingLeft: 6 }}>
+            <Collab senderId={currentUserId!} receiverId={post.userId} postId={post.id} />
+          </View>
         </View>
-      </Pressable>
+      )}
     </View>
-    
-    {currentUserId && (
-  <View style={styles.collabButtonWrapper}>
-    <Collab senderId={currentUserId} receiverId={post.userId} postId={post.id} />
-  </View>
-)}
-
-    
-  </View>
-)
-
+  )
 }
 
-// Stylesheet: kan zo blijven, is geen enkel probleem
 const styles = StyleSheet.create({
-  fullScreen: {
-    position: "relative",
-    width: windowWidth,
-    height: 780,
-    backgroundColor: "#000",
+  rowPressable: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    width: "100%",
   },
-  mediaContainer: {
-    width: windowWidth,
-    borderRadius: scale * 10,
+  mediaBubble: {
+    borderRadius: BUBBLE_RADIUS,
+    backgroundColor: "#191919",
     overflow: "hidden",
-    backgroundColor: "#000",
-    height: scale * 575,
-    alignSelf: "center",
-    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 8,
+    position: "relative"
   },
   media: {
     width: "100%",
     height: "100%",
-    position: "relative",
-    zIndex: 0,
+    borderRadius: BUBBLE_RADIUS,
+    resizeMode: "cover",
+    backgroundColor: "#222",
   },
-displayNameRoleOverlay: {
-  position: "absolute",
-  top: scale * 12,
-  left: scale * 3,
-  flexDirection: "row",
-  alignItems: "center",
-  zIndex: 12,
-  
-  borderRadius: scale * 8,
-  paddingHorizontal: scale * 10,
-  paddingVertical: scale * 5,
-},
-displayNameRoleText: {
-  color: "#e6e6e6",
-  fontWeight: "600",
-  fontSize: scale * 10,
-  fontFamily: 'Manrope_400Regular' // of 'Manrope_700Bold'
-},
-
-dot: {
-  color: "#e6e6e6",
-  fontSize: scale * 15,
-  marginHorizontal: scale * 4,
-  fontWeight: "600",
-},
-
-moreOptionsOverlay: {
-  position: "absolute",
-  top: scale * 10,
-  right: scale * 7,
-  zIndex: 12,
-  // optioneel achtergrond of padding als je wilt dat 'ie beter afsteekt:
-  // backgroundColor: "rgba(0,0,0,0.4)",
-  // borderRadius: scale * 8,
-  // padding: scale * 3,
-},
-
-profileRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between", // <-- BELANGRIJK!
-  width: "100%",                   // <-- VOEG DEZE TOE!
-  marginBottom: scale * 8,
-},
-
-
-profilePic: {
-  width: scale * 23,
-  height: scale * 23,
-  borderRadius: scale * 14,
-  marginRight: scale * 5,
-  
- 
-},
-
-profileUsername: {
-  color: "#fff",
-  fontFamily: "Manrope_700Bold",
-  fontSize: scale * 12,
-  
-},
-
-
-midoverlay: {
-  position: "absolute",
-  left: scale * 14,
-  right: scale * 14,
-  bottom: scale * 112, // net boven je tagsBar
-  zIndex: 15,
-  flexDirection: 'column',
-  alignItems: 'flex-start',
-},
-
-waveForm: {
-  marginLeft: "auto", // duwt de waveform helemaal rechts in de row
-  alignSelf: "center",
-},
-
-
-
-tagsBar: {
-  position: "absolute",
-  left: scale * 14,      // zelfde padding als andere overlays
-  right: scale * 14,
-  bottom: scale * 70,    // nét boven je seekbar/controls, pas aan tot het mooi is
-  flexDirection: "row",
-  alignItems: "center",
-  zIndex: 12,
-},
-artistTagsRow: {
-  flexDirection: "row",
-  alignItems: "center",
-},
-artistTagBubble: {
-  zIndex: 10,
-},
-genreTagsRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  marginLeft: scale * 5,  // ruimte tussen artist en genre tags
-},
-
-
-
-
   playIconOverlay: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     justifyContent: "center",
     alignItems: "center",
+    width: "100%",
+    height: "100%",
     zIndex: 5,
     opacity: 0.7,
   },
-  controlsContainer: {
-    position: "absolute",
-    bottom: scale * 30,
-    left: scale * 10,
-    right: scale * 10,
+  infoBubble: {
+    borderRadius: BUBBLE_RADIUS,
+    padding: 10,
+    minHeight: 70,
+    backgroundColor: "#101014",
+    flex: 1,
+    overflow: "hidden"
+  },
+  profileUsername: {
+    color: "#fff",
+    fontFamily: "Manrope_700Bold",
+    fontSize: 14,
+    marginRight: 8,
+    maxWidth: 70
+  },
+  profilePic: {
+    width: 20,
+    height: 20,
+    borderRadius: 12,
+    marginLeft: 7,
+  },
+  roleText: {
+    color: "#bbb",
+    fontSize: 10,
+    marginBottom: 2,
+    fontFamily: "Manrope_400Regular",
+  },
+  titleText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 12,
+    marginBottom: 2,
+    lineHeight: 15,
+  },
+  descriptionText: {
+    color: "#bcbcbc",
+    fontSize: 9.5,
+    marginBottom: 3,
+  },
+  tagsScrollRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    minHeight: 20,
   },
-  seekbarContainer: {
-    width: scale * 200,
-    right: scale * 10,
-
+  artistTagBubble: {
+    marginRight: 5,
   },
-  timeLabelCurrent: {
-    width: scale * 40,
+  tagBubble: {
+    backgroundColor: "#39393b",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginRight: 4,
+    marginBottom: 2,
+  },
+  seekbarRow: {
+    flexDirection: "row",
     alignItems: "center",
-    right: scale * 5,
+    marginTop: 0,
+    marginBottom: 0,
   },
-  timeLabelRemaining: {
-    width: scale * 40,
-    alignItems: "center",
-    left: scale * 40,
+  seekbar: {
+    flex: 1,
+    marginHorizontal: 5,
+    maxWidth: 54,
+    minWidth: 35,
+    height: 10,
   },
-  timeText: {
+  seekbarTimeText: {
     color: "white",
-    fontSize: scale * 10,
-    fontFamily: "Manrope_400Regular", // of 'Manrope_700Bold'
+    fontSize: 9.5,
+    fontFamily: "Manrope_400Regular",
+    width: 25,
+    textAlign: "center",
   },
-  collabButtonWrapper: {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  top: scale * 575 - (scale * 25), // media hoogte min de helft van de knophoogte (stel knop is 50)
-  alignItems: "center",
-  zIndex: 20,
-},
-
+  expandedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 7,
+    width: "100%",
+    paddingHorizontal: 2,
+  },
+  saveButton: {
+    width: "100%",
+    backgroundColor: "#21212A",
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 7,
+  },
+  saveButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 12,
+  },
 })
 
-export default PostComponent
+export default PostComponent;

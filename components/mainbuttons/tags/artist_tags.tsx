@@ -89,8 +89,8 @@ const ArtistTag: React.FC<ArtistTagProps> = ({ id, name, image, disableModuleOpe
 
 const styles = StyleSheet.create({
   imageContainer: {
-    width: 28,
-    height: 28,
+    width: 20,
+    height: 20,
     borderRadius: 15,
     overflow: "hidden",
     backgroundColor: "#ccc",
