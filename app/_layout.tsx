@@ -10,7 +10,18 @@ import { RootStackParamList } from '../routes';
 import { AuthProvider, useAuth } from '../context/authContext'; // ✅ Import AuthContext
 import  EditProfile  from "./screens/editprofile";
 
-import { useFonts, Manrope_400Regular, Manrope_700Bold } from '@expo-google-fonts/manrope';
+import { useFonts, Manrope_400Regular, Manrope_700Bold,  } from '@expo-google-fonts/manrope';
+import { 
+  Jost_100Thin,
+  Jost_200ExtraLight,
+  Jost_300Light,
+  Jost_400Regular,
+  Jost_500Medium,
+  Jost_600SemiBold,
+  Jost_700Bold,
+  Jost_800ExtraBold,
+  Jost_900Black,
+} from '@expo-google-fonts/jost';
 
 import * as Haptics from 'expo-haptics'
 import { useContext } from 'react'
@@ -288,11 +299,22 @@ export default function AppNavigator() {
   const [fontsLoaded] = useFonts({
     Manrope_400Regular,
     Manrope_700Bold,
+    Jost_100Thin,
+    Jost_200ExtraLight,
+    Jost_300Light,
+    Jost_400Regular,
+    Jost_500Medium,
+    Jost_600SemiBold,
+    Jost_700Bold,
+    Jost_800ExtraBold,
+    Jost_900Black,
   });
 
   if (!fontsLoaded) {
     return null;
   }
+
+  
 
   return (
     <AuthProvider>

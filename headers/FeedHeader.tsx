@@ -106,6 +106,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#000000",
     paddingHorizontal: 8,
     transform: [{ translateY: -64 }],
+    marginBottom: 30,
   },
   headerContent: {
     flexDirection: "row",

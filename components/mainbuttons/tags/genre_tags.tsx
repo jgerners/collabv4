@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
       text: {
         fontSize: 11,
         color: "white",
-        fontFamily: 'Manrope_700Regular', // of 'Manrope_700Bold'
+        fontFamily: 'Jost_600SemiBold', // of 'Manrope_700Bold'
         fontWeight: "bold",
         textAlign: "center",
         textAlignVertical: "center", // Voeg dit toe
