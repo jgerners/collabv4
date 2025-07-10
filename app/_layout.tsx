@@ -1,10 +1,8 @@
 import { createStackNavigator } from '@react-navigation/stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import React from 'react';
-import { View, TouchableOpacity, Image, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import { createBottomTabNavigator, BottomTabBar } from '@react-navigation/bottom-tabs';
+import React, { useState, useContext } from 'react';
+import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { RootStackParamList } from '../routes';
 import { AuthProvider, useAuth } from '../context/authContext'; // ✅ Import AuthContext
@@ -24,18 +22,14 @@ import {
 } from '@expo-google-fonts/jost';
 
 import * as Haptics from 'expo-haptics'
-import { useContext } from 'react'
 import { ZoomContext, ZoomProvider } from '../context/zoomContext'
 
 import { Ionicons } from '@expo/vector-icons';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import FeedHeader from '../headers/FeedHeader';
-
 import UploadNavigator from '../navigation/UploadNavigator';
-
 import SelectMediaScreen from '../app/screens/SelectMediaScreen'
-
 import { StatusBar } from 'expo-status-bar';
 
 // 📌 Screens Importeren
@@ -53,6 +47,9 @@ import RegisterScreen from "./auth/register"; // ✅ Register
 import uploadProfileMediaScreen from "./screens/uploadProfileMediaScreen"; // ✅ Register
 import demoDetailScreen from './screens/demoDetailScreen';
 
+// ⬇️ DIT IS DE ENIGE EXTRA IMPORT
+import FeedNavBar from '../components/FeedNavBar';
+
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
@@ -61,6 +58,9 @@ function TabsLayout() {
   const colorScheme = useColorScheme();
   const { profile } = useAuth(); // ✅ Profielfoto ophalen
   const zoom = useContext(ZoomContext)!
+
+  // STATE: voor feed tabbar visibility
+  const [feedBarVisible, setFeedBarVisible] = useState(true);
 
   return (
     <Tab.Navigator
@@ -115,7 +115,7 @@ function TabsLayout() {
             case 'COLLABS!':
               return (
                 <MaterialCommunityIcons
-                  name="chat" // vul hier een bestaand chat icon in
+                  name="chat"
                   size={25}
                   color={color}
                   style={{ opacity }}
@@ -155,10 +155,31 @@ function TabsLayout() {
           }
         },
       })}
+      // ⬇️ TABBAR: Custom alleen als FEED actief, anders standaard
+      tabBar={props => {
+        const isFeedActive = props.state.routes[props.state.index].name === 'Feed';
+        if (isFeedActive) {
+          return (
+            <FeedNavBar
+              {...props}
+              visible={feedBarVisible}
+              onPressPlus={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+                props.navigation.navigate('SelectMediaModal');
+              }}
+            />
+          );
+        }
+        // Gewoon de standaard react-navigation tabbar
+        return <BottomTabBar {...props} />;
+      }}
     >
       <Tab.Screen
         name="Feed"
-        component={FeedScreen}
+        // Geef de setter door aan FeedScreen!
+        children={props => (
+          <FeedScreen {...props} setFeedBarVisible={setFeedBarVisible} />
+        )}
         options={{
           headerShown: false,
         }}
@@ -313,8 +334,6 @@ export default function AppNavigator() {
   if (!fontsLoaded) {
     return null;
   }
-
-  
 
   return (
     <AuthProvider>

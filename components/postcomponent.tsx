@@ -17,12 +17,12 @@ import Collab from "./mainbuttons/collab"
 import ArtistTag from "./mainbuttons/tags/artist_tags"
 import Title from "./mainbuttons/title"
 import ReplayButton from "./mainbuttons/replay"
-import { BlurView } from "expo-blur" // <-- Blur import
+import { BlurView } from "expo-blur"
 
 const H_MARGIN = 16
-const MEDIA_SIZE = 140
-const INFO_WIDTH = 235
-const BUBBLE_HEIGHT = 140
+const MEDIA_SIZE = 155
+const INFO_WIDTH = 215
+const BUBBLE_HEIGHT = 155
 const BUBBLE_RADIUS = 12
 
 export interface ArtistTagData {
@@ -107,7 +107,6 @@ const PostComponent: React.FC<PostProps> = ({
   })
 
   const isActive = activePostId === post.id
-  // Eén ref en state voor de actieve media (werkt voor bubble en modal)
   const videoRef = useRef<Video | null>(null)
   const audioRef = useRef<Audio.Sound | null>(null)
   const [isPlaying, setIsPlaying] = React.useState(false)
@@ -312,12 +311,10 @@ const PostComponent: React.FC<PostProps> = ({
     }
   }
 
-  // Reset slide als de post sluit
   useEffect(() => {
     if (!isActive) setCurrentSlide(0)
   }, [isActive])
 
-  // Slide click handler
   const handleInfoBubblePress = () => {
     setCurrentSlide((prev) => (prev === 0 ? 1 : 0))
   }
@@ -347,7 +344,6 @@ const PostComponent: React.FC<PostProps> = ({
     }
   }
 
-  // Seekbar apart renderen
   const renderModalSeekbar = () => (
     <View style={styles.seekbarModalRow} pointerEvents="box-none">
       <Text style={styles.seekbarTimeText}>{formatTime(animatedTime)}</Text>
@@ -366,18 +362,19 @@ const PostComponent: React.FC<PostProps> = ({
     </View>
   )
 
-  // MODAL SLUITEN: buiten media/seekbar klikken
   const modalPressHandler = (evt: any) => {
-    // Only close if the target is the overlay (not a child)
     if (evt.target === evt.currentTarget) setMediaModalOpen(false)
   }
+
+  // Breedte titel max 80% van de bubble
+  const TITLE_MAX_WIDTH = INFO_WIDTH * 0.8
 
   return (
     <>
       <Animated.View
         style={{
           marginHorizontal: H_MARGIN,
-          marginBottom: 30,
+          marginBottom: 20,
           transform: [
             {
               translateY: pushDownAnimation.interpolate({
@@ -389,7 +386,7 @@ const PostComponent: React.FC<PostProps> = ({
         }}
       >
         <View style={styles.rowPressable}>
-          {/* MEDIA BUBBLE (alleen als modal niet open is) */}
+          {/* MEDIA BUBBLE */}
           {!isMediaModalOpen && (
             <Pressable
               style={[styles.mediaBubble, { width: MEDIA_SIZE, height: BUBBLE_HEIGHT }]}
@@ -404,7 +401,7 @@ const PostComponent: React.FC<PostProps> = ({
             </Pressable>
           )}
 
-          {/* INFO BUBBLE (2 slides, click only) */}
+          {/* INFO BUBBLE (2 slides) */}
           <Pressable
             style={[
               styles.infoBubble,
@@ -432,52 +429,76 @@ const PostComponent: React.FC<PostProps> = ({
               }}
             >
               {/* SLIDE 1 */}
-              <View style={{ width: INFO_WIDTH, justifyContent: "center" }}>
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 3 }}>
-                  <Text style={styles.profileUsername} numberOfLines={1} ellipsizeMode="tail">
+              <View style={{ width: INFO_WIDTH, justifyContent: "flex-start" }}>
+                {/* Username + profielfoto STRAK naast elkaar */}
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 1 }}>
+                  <Text
+                    style={styles.profileUsername}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
                     {post.username}
                   </Text>
-                  <Text
-                    style={{
-                      color: "#888",
-                      fontSize: 10,
-                      fontFamily: "Jost_600SemiBold",
-                      marginLeft: 7,
-                    }}
-                  >
-                    {post.role}
-                  </Text>
+                  <Image
+                    source={{ uri: post.profileImage }}
+                    style={styles.profileImage}
+                  />
                 </View>
-                <Title title={post.title} maxLines={2} textStyle={styles.titleText} />
-                <View style={{ minHeight: 22, marginTop: 2, marginBottom: 8 }}>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.tagsScrollRow}
-                    style={{ marginBottom: 0 }}
-                  >
-                    {(post.artistTags || []).map((tagId) => {
-                      const tag = artistTags.find((t) => t.id === tagId)
-                      if (!tag) return null
-                      return (
-                        <View key={tag.id} style={styles.artistTagBubble}>
-                          <ArtistTag id={tag.id} name={tag.name} image={tag.image} />
-                        </View>
-                      )
-                    })}
-                    {(post.genreTags || []).map((tagId) => {
-                      const tag = genreTags.find((t) => t.id === tagId)
-                      return tag ? (
-                        <View key={tag.id} style={styles.tagBubble}>
-                          <Text style={{ color: "#fff", fontSize: 9 }}>{tag.name}</Text>
-                        </View>
-                      ) : null
-                    })}
-                  </ScrollView>
+                {/* Role onder username */}
+                <Text style={styles.profileRole} numberOfLines={1}>
+                  {post.role}
+                </Text>
+
+                {/* Title max 80% breed */}
+                <View style={{ minHeight: 36, justifyContent: "flex-start" }}>
+                  <Title title= {post.title} 
+                  maxLines={2}
+                  textStyle={StyleSheet.flatten([styles.titleText, { maxWidth: TITLE_MAX_WIDTH }])}  />
                 </View>
+               {/* ARTIST tags overlappen, genre tags inline erachter */}
+<View style={styles.tagsCombinedRow}>
+  {/* Overlappende artist tags */}
+  <View style={styles.tagsOverlapContainer}>
+    {(post.artistTags || []).map((tagId, i) => {
+      const tag = artistTags.find((t) => t.id === tagId)
+      if (!tag) return null
+      return (
+        <View
+          key={tag.id}
+          style={[
+            styles.artistTagBubbleOverlap,
+            { left: i * 16, zIndex: ((post.artistTags && post.artistTags.length) ? post.artistTags.length : 0) - i }
+          ]}
+        >
+          <ArtistTag id={tag.id} name={tag.name} image={tag.image} />
+        </View>
+      )
+    })}
+  </View>
+
+  {/* Genre tags ernaast, netjes uitgelijnd */}
+  {(() => {
+    const artistTagCount = post.artistTags?.length ?? 0;
+    const genreTagMarginLeft = artistTagCount > 0 ? ((artistTagCount - 1) * 16 + 34) : 0;
+    return (
+      <View style={[styles.genreTagsInlineRow, { marginLeft: genreTagMarginLeft }]}>
+        {(post.genreTags || []).map((tagId) => {
+          const tag = genreTags.find((t) => t.id === tagId)
+          if (!tag) return null
+          return (
+            <View key={tag.id} style={styles.genreTagBubbleInline}>
+              <Text style={{ color: "#fff", fontSize: 9 }}>{tag.name}</Text>
+            </View>
+          )
+        })}
+      </View>
+    );
+  })()}
+</View>
+
               </View>
 
-              {/* SLIDE 2 - Clean version zonder profile */}
+              {/* SLIDE 2 - Beschrijving */}
               <View
                 style={{
                   width: INFO_WIDTH,
@@ -487,7 +508,6 @@ const PostComponent: React.FC<PostProps> = ({
                   paddingTop: 8,
                 }}
               >
-                {/* Beschrijving - 3 regels */}
                 <Text
                   style={{
                     ...styles.descriptionText,
@@ -500,7 +520,6 @@ const PostComponent: React.FC<PostProps> = ({
                 >
                   {post.description}
                 </Text>
-                {/* Seekbar is hier hidden */}
                 <View style={[styles.seekbarRow, { opacity: 0, marginTop: 4, width: "100%" }]} />
               </View>
             </Animated.View>
@@ -567,7 +586,6 @@ const PostComponent: React.FC<PostProps> = ({
           ]}
           pointerEvents={isActive ? "auto" : "none"}
         >
-          {/* Save knop */}
           <View style={styles.saveButtonContainer}>
             <TouchableOpacity style={styles.saveButton} onPress={toggleSave} activeOpacity={0.85}>
               <Bookmark
@@ -579,8 +597,6 @@ const PostComponent: React.FC<PostProps> = ({
               <Text style={styles.saveButtonText}>{saved ? "Saved" : "Save"}</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Collab knop */}
           <View style={{ width: INFO_WIDTH, alignItems: "center" }}>
             <Collab senderId={currentUserId!} receiverId={post.userId} postId={post.id} width={INFO_WIDTH} />
           </View>
@@ -589,37 +605,36 @@ const PostComponent: React.FC<PostProps> = ({
 
       {/* MODAL */}
       <Modal
-  visible={isMediaModalOpen}
-  animationType="fade"
-  transparent={true}
-  onRequestClose={() => setMediaModalOpen(false)}
->
-  <Pressable
-    style={styles.modalOverlay}
-    onPress={() => setMediaModalOpen(false)}
-  >
-    <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
-    <View style={styles.modalContent} pointerEvents="box-none">
-      {/* MEDIA */}
-      <Pressable
-        style={styles.mediaContainer}
-        pointerEvents="box-only"
-        onPress={(e) => e.stopPropagation && e.stopPropagation()}
+        visible={isMediaModalOpen}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setMediaModalOpen(false)}
       >
-        {renderMedia(true)}
-      </Pressable>
-      {/* SEEKBAR */}
-      <Pressable
-        style={styles.seekbarModalContainer}
-        pointerEvents="box-only"
-        onPress={(e) => e.stopPropagation && e.stopPropagation()}
-      >
-        {renderModalSeekbar()}
-      </Pressable>
-    </View>
-  </Pressable>
-</Modal>
-
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setMediaModalOpen(false)}
+        >
+          <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={styles.modalContent} pointerEvents="box-none">
+            {/* MEDIA */}
+            <Pressable
+              style={styles.mediaContainer}
+              pointerEvents="box-only"
+              onPress={(e) => e.stopPropagation && e.stopPropagation()}
+            >
+              {renderMedia(true)}
+            </Pressable>
+            {/* SEEKBAR */}
+            <Pressable
+              style={styles.seekbarModalContainer}
+              pointerEvents="box-only"
+              onPress={(e) => e.stopPropagation && e.stopPropagation()}
+            >
+              {renderModalSeekbar()}
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </>
   )
 }
@@ -646,6 +661,7 @@ const styles = StyleSheet.create({
     borderRadius: BUBBLE_RADIUS,
     resizeMode: "cover",
     backgroundColor: "#222",
+    
   },
   modalMedia: {
     width: 350,
@@ -672,23 +688,45 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 10,
     minHeight: 70,
-    backgroundColor: "#16141A",
+    backgroundColor: "#181818",
     overflow: "hidden",
     opacity: 1,
+  
   },
   profileUsername: {
     color: "#fff",
-    fontFamily: "Jost_800ExtraBold",
+    fontFamily: "Jost_600SemiBold",
     fontSize: 15,
-    marginRight: 8,
-    maxWidth: 70,
+    marginRight: 7,
+    maxWidth: 90,
+    marginBottom: 0,
+    marginLeft: 5,
+    marginTop: 4,
+  },
+  profileImage: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginLeft: 5,
+    marginBottom: 1,
+  },
+  profileRole: {
+    color: "#bcbcbc",
+    fontFamily: "Jost_600SemiBold",
+    fontSize: 10,
+    marginTop: -1,
+    maxWidth: 90,
+    opacity: 0.8,
+    marginBottom: 3,
+    marginLeft: 5,
   },
   titleText: {
     color: "#fff",
-    fontFamily: "Jost_600SemiBold",
+    fontFamily: "Jost_300Light",
     fontSize: 12,
     marginBottom: 2,
     lineHeight: 15,
+    marginLeft: 5,
   },
   descriptionText: {
     color: "#bcbcbc",
@@ -697,21 +735,47 @@ const styles = StyleSheet.create({
     marginBottom: 3,
     opacity: 0,
   },
-  tagsScrollRow: {
+  // --- Tags row ---
+  tagsCombinedRow: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 20,
+    minHeight: 32,
+    position: "relative",
+    height: 32,
+    marginTop: 4,
+    marginLeft: 4,
   },
-  artistTagBubble: {
-    marginRight: 5,
+  tagsOverlapContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    position: "relative",
+    height: 32,
+    minWidth: 10,
   },
-  tagBubble: {
-    backgroundColor: "#39393b",
+  artistTagBubbleOverlap: {
+    position: "absolute",
+    top: 0,
+  },
+  genreTagsInlineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 25,
+    marginLeft: 0,
+    transform: [
+    { translateY: -5 },    // omhoog
+    { translateX: -15 },    // naar links (gebruik een positief getal voor naar rechts)
+  ],
+    
+  },
+  genreTagBubbleInline: {
+    backgroundColor: "transparent",
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 2,
     marginRight: 4,
     marginBottom: 2,
+    borderWidth: 1,
+    borderColor: "#555",
   },
   seekbarRow: {
     flexDirection: "row",
@@ -775,7 +839,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     justifyContent: "center",
     alignItems: "center",
-    // Geen achtergrondkleur, geen padding
   },
   mediaContainer: {
     borderRadius: 18,
