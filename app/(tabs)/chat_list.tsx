@@ -213,24 +213,24 @@ const ChatsListScreen: React.FC = () => {
 export default ChatsListScreen;
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "black" },
+  safeArea: { flex: 1, backgroundColor: "#0C0C0C" },
   tabSelector: {
     flexDirection: "row",
     justifyContent: "space-evenly",
-    backgroundColor: "black",
+    backgroundColor: "#0C0C0C",
     paddingVertical: 10,
     borderRadius: 10,
     margin: 16,
     marginTop: 70,
   },
-  tabButton: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 15 },
-  activeTab: { backgroundColor: "#A020F0" },
+  tabButton: { paddingVertical: 4, paddingHorizontal: 20, borderRadius: 10 },
+  activeTab: { backgroundColor: "#4B0092" },
   tabText: { color: "white", fontWeight: "bold" },
   activeTabText: { color: "#FFF" },
   chatItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1E1E1E",
+    backgroundColor: "#0C0C0C",
     padding: 12,
     borderRadius: 10,
     marginBottom: 10,
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   notificationItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1E1E1E",
+    backgroundColor: "#0C0C0C",
     padding: 12,
     borderRadius: 10,
     marginBottom: 10,

@@ -28,8 +28,9 @@ export default function SelectMediaScreen() {
   const [denied, setDenied] = useState(false);
   const [mode, setMode] = useState<'video' | 'photo'>('photo');
 
-  const numColumns = 4;
-  const itemSize = Dimensions.get('window').width / numColumns;
+  const numColumns = 3;
+  const spacing = 8; // ruimte tussen de foto's
+  const itemSize = (Dimensions.get('window').width - spacing * (numColumns + 1)) / numColumns;
 
   useEffect(() => {
     (async () => {
@@ -126,12 +127,19 @@ export default function SelectMediaScreen() {
           keyExtractor={item => item.id}
           numColumns={numColumns}
           renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => onPressAsset(item)}>
+            <TouchableOpacity onPress={() => onPressAsset(item)}
+            style={{ margin: spacing / 2 }} // 👈 spacing tussen items
+            >
+              
               <Image
-                source={{ uri: item.uri }}
-                contentFit="cover"
-                style={{ width: itemSize, height: itemSize }}
-              />
+  source={{ uri: item.uri }}
+  contentFit="cover"
+  style={{
+    width: itemSize,
+    height: itemSize * 1.4, // ← maak dit groter, bv. 1.2 = 20% hoger
+    borderRadius: 10,
+  }}
+/>
             </TouchableOpacity>
           )}
           showsVerticalScrollIndicator={false}
@@ -157,7 +165,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: '70%',
+    height: '90%',
     backgroundColor: 'black',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,

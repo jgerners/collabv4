@@ -189,7 +189,7 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#131313",
+    backgroundColor: "#0C0C0C",
     paddingHorizontal: 18,
     paddingBottom: 0,
     marginBottom: 2,
@@ -205,18 +205,18 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#131313",
+    backgroundColor: "#0C0C0C",
     borderRadius: 12,
     borderWidth: 0.5,
     borderColor: "white",
     height: 36,
     marginRight: 10,
-    marginLeft: 8,
+    marginLeft: 0,
   },
   searchInput: {
     flex: 1,
     height: 36,
-    color: "#fff",
+    color: "#0C0C0C",
     fontSize: 15,
     paddingHorizontal: 8,
     paddingTop: 1,
@@ -235,7 +235,8 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     borderRadius: 12,
     paddingVertical: 0,
-    marginLeft: 1
+    marginLeft: 1,
+    transform: [{ translateX: 6}],
   },
   foryouText: {
     color: "#fff",

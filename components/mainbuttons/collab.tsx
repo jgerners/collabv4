@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
   bubble: {
     backgroundColor: "#4B0092", // Standaard achtergrondkleur, kan overschreven worden door de prop
     width: "100%", // Standaard breedte, kan overschreven worden door de prop
-    borderRadius: 15,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     minHeight: 33,

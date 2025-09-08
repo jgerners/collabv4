@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
-  Dimensions,
   Image,
   Alert,
   ScrollView,
@@ -17,12 +16,13 @@ import { supabase } from "../../supabaseClient";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../context/authContext";
 import { generateVideoThumbnail } from "../../helpers/videoThumbnailHelper";
-import ProfileLink from "../../components/profileLink";
 import ArtistTag from "../../components/mainbuttons/tags/artist_tags";
 import GenreTag from "../../components/mainbuttons/tags/genre_tags";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
-// ExtendedUser interface; pas dit aan indien nodig
+
+
+// ExtendedUser interface
 export interface ExtendedUser {
   id: string;
   username: string;
@@ -38,7 +38,7 @@ const getPresignedUrl = async (
 ): Promise<string | null> => {
   try {
     const response = await fetch(
-      `http://192.168.178.143:3000/get-presigned-url?fileName=${encodeURIComponent(
+      `http://192.168.178.101:3000/get-presigned-url?fileName=${encodeURIComponent(
         uniqueName
       )}&contentType=${encodeURIComponent(contentType)}`
     );
@@ -60,15 +60,20 @@ const uploadFileToS3 = async (
     const response = await fetch(fileUri);
     const blob = await response.blob();
     console.log("Blob verkregen, size:", blob.size);
+
     const fileName = fileUri.split("/").pop();
     const uniqueName = `${folder}/${Date.now()}_${fileName}`;
     console.log("UniqueName gegenereerd:", uniqueName);
+
     const contentType = blob.type || "application/octet-stream";
     const presignedUrl = await getPresignedUrl(uniqueName, contentType);
+
     if (!presignedUrl) {
       throw new Error("Geen pre-signed URL ontvangen");
     }
+
     console.log("Presigned URL ontvangen:", presignedUrl);
+
     const uploadResponse = await fetch(presignedUrl, {
       method: "PUT",
       headers: {
@@ -76,10 +81,12 @@ const uploadFileToS3 = async (
       },
       body: blob,
     });
+
     if (!uploadResponse.ok) {
       console.error("Upload naar S3 mislukt:", uploadResponse.statusText);
       return null;
     }
+
     const publicUrl = `https://collabpostmedia.s3.amazonaws.com/${uniqueName}`;
     console.log("Publieke URL verkregen:", publicUrl);
     return publicUrl;
@@ -93,8 +100,21 @@ const UploadScreen: React.FC = () => {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
 
-  // Volledige gebruiker ophalen uit Supabase (pas de tabelnaam "profiles" aan indien nodig)
+  // States
   const [currentUser, setCurrentUser] = useState<ExtendedUser | null>(null);
+  const [allArtistTags, setAllArtistTags] = useState<any[]>([]);
+  const [allGenreTags, setAllGenreTags] = useState<any[]>([]);
+  const [uploadType, setUploadType] = useState<"video" | "photo">("video");
+  const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
+  const [selectedAudio, setSelectedAudio] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedArtistTags, setSelectedArtistTags] = useState<string[]>([]);
+  const [selectedGenreTags, setSelectedGenreTags] = useState<string[]>([]);
+
+  // Fetch user data
   useEffect(() => {
     const fetchUserData = async () => {
       if (user) {
@@ -103,15 +123,16 @@ const UploadScreen: React.FC = () => {
           .select("*")
           .eq("id", user.id)
           .single();
+
         if (error) {
           console.error("Error fetching user data:", error);
         } else {
           const formattedUser: ExtendedUser = {
             id: data.id,
             username: data.username,
-            displayName: data.display_name, // Zorg dat dit overeenkomt met jouw databaseveld
+            displayName: data.display_name,
             role: data.role,
-            profileImage: data.profile_pic, // Pas aan indien je veld anders heet
+            profileImage: data.profile_pic,
           };
           setCurrentUser(formattedUser);
         }
@@ -120,9 +141,7 @@ const UploadScreen: React.FC = () => {
     fetchUserData();
   }, [user]);
 
-  // Volledige lijst met tags ophalen uit de database
-  const [allArtistTags, setAllArtistTags] = useState<any[]>([]);
-  const [allGenreTags, setAllGenreTags] = useState<any[]>([]);
+  // Fetch tags
   useEffect(() => {
     const fetchArtistTags = async () => {
       const { data, error } = await supabase.from("artistTags").select("*");
@@ -132,6 +151,7 @@ const UploadScreen: React.FC = () => {
         setAllArtistTags(data);
       }
     };
+
     const fetchGenreTags = async () => {
       const { data, error } = await supabase.from("genreTags").select("*");
       if (error) {
@@ -140,49 +160,38 @@ const UploadScreen: React.FC = () => {
         setAllGenreTags(data);
       }
     };
+
     fetchArtistTags();
     fetchGenreTags();
   }, []);
 
-  // Overige states voor upload en content
-  const [uploadType, setUploadType] = useState<"video" | "photo">("video");
-  const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
-  const [selectedAudio, setSelectedAudio] = useState<string | null>(null);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // De geselecteerde tags worden hier als arrays van id's opgeslagen (bijv. "artist_1")
-  const [selectedArtistTags, setSelectedArtistTags] = useState<string[]>([]);
-  const [selectedGenreTags, setSelectedGenreTags] = useState<string[]>([]);
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [editingDescription, setEditingDescription] = useState(false);
-
-  const windowWidth = Dimensions.get("window").width;
-  const scale = windowWidth / 370;
-
   const pickMedia = async () => {
-    console.log("pickMedia gestart");
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: uploadType === "video" 
+        ? ImagePicker.MediaTypeOptions.Videos 
+        : ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 1,
     });
-    console.log("Result van ImagePicker:", result);
+
     if (!result.canceled) {
-      console.log("Media geselecteerd:", result.assets[0].uri);
       setSelectedMedia(result.assets[0].uri);
     }
   };
 
   const pickAudio = async () => {
-    console.log("pickAudio gestart");
     const result = await DocumentPicker.getDocumentAsync({ type: "audio/*" });
-    console.log("Result van DocumentPicker:", result);
+
     if (!result.canceled && result.assets?.length > 0) {
-      console.log("Audio geselecteerd:", result.assets[0].uri);
       setSelectedAudio(result.assets[0].uri);
     }
+  };
+
+  const handleUploadTypeChange = (type: "video" | "photo") => {
+    setUploadType(type);
+    // Reset media when switching types
+    setSelectedMedia(null);
+    setSelectedAudio(null);
   };
 
   const handleUpload = async () => {
@@ -190,6 +199,7 @@ const UploadScreen: React.FC = () => {
       setError("Je moet ingelogd zijn om een post te plaatsen.");
       return;
     }
+
     setUploading(true);
     setError(null);
 
@@ -198,10 +208,9 @@ const UploadScreen: React.FC = () => {
     let videoThumbnailUrl = "";
 
     if (selectedMedia) {
-      console.log("Geselecteerde media URI:", selectedMedia);
       const folder = uploadType === "video" ? "videos" : "images";
       const url = await uploadFileToS3(selectedMedia, folder);
-      console.log("Media URL van uploadFileToS3:", url);
+
       if (url) {
         mediaPublicUrl = url;
       } else {
@@ -209,30 +218,31 @@ const UploadScreen: React.FC = () => {
         setUploading(false);
         return;
       }
+
       if (uploadType === "video") {
+        console.log("Generating thumbnail for video:", selectedMedia);
         const thumbnailLocalUri = await generateVideoThumbnail(selectedMedia);
         if (thumbnailLocalUri) {
+          console.log("Thumbnail generated, uploading to S3...");
           const thumbnailUrl = await uploadFileToS3(thumbnailLocalUri, "video_thumbnails");
           if (thumbnailUrl) {
             videoThumbnailUrl = thumbnailUrl;
-            console.log("Video thumbnail URL:", videoThumbnailUrl);
+            console.log("Thumbnail uploaded successfully:", thumbnailUrl);
           } else {
-            setError("Fout bij uploaden van video thumbnail.");
-            setUploading(false);
-            return;
+            console.warn("Failed to upload thumbnail, continuing without thumbnail");
+            // Don't fail the entire upload if thumbnail fails
+            videoThumbnailUrl = "";
           }
         } else {
-          setError("Fout bij genereren van video thumbnail.");
-          setUploading(false);
-          return;
+          console.warn("Failed to generate thumbnail, continuing without thumbnail");
+          // Don't fail the entire upload if thumbnail generation fails
+          videoThumbnailUrl = "";
         }
       }
     }
 
     if (selectedAudio) {
-      console.log("Geselecteerde audio URI:", selectedAudio);
       const url = await uploadFileToS3(selectedAudio, "audio");
-      console.log("Audio URL van uploadFileToS3:", url);
       if (url) {
         audioPublicUrl = url;
       } else {
@@ -241,10 +251,6 @@ const UploadScreen: React.FC = () => {
         return;
       }
     }
-
-    console.log("mediaPublicUrl:", mediaPublicUrl);
-    console.log("audioPublicUrl:", audioPublicUrl);
-    console.log("videoThumbnailUrl:", videoThumbnailUrl);
 
     const newPost = {
       userId: currentUser?.id,
@@ -264,34 +270,30 @@ const UploadScreen: React.FC = () => {
       isPlaying: false,
     };
 
-    console.log("Nieuwe post object:", newPost);
-
     try {
       const { error: supabaseError } = await supabase
         .from("posts")
         .insert([newPost])
         .select();
+
       if (supabaseError) {
         setError(supabaseError.message);
-        console.error("Database insert error:", supabaseError);
       } else {
-        console.log("Post succesvol aangemaakt");
         setTitle("");
         setDescription("");
         setSelectedMedia(null);
         setSelectedAudio(null);
         setSelectedArtistTags([]);
         setSelectedGenreTags([]);
+        navigation.goBack();
       }
     } catch (err) {
-      console.error("Fout bij post-insert:", err);
       setError("Er is iets misgegaan bij het opslaan van de post.");
     }
+
     setUploading(false);
-    console.log("handleUpload beëindigd");
   };
 
-  // Navigatie naar de tag-selectie-schermen (let op: doorgeven van functies geeft een non-serializable warning)
   const goToArtistTagSelect = () => {
     navigation.navigate("ArtistTagSelect", {
       onSave: (tags: string[]) => setSelectedArtistTags(tags),
@@ -304,16 +306,19 @@ const UploadScreen: React.FC = () => {
     });
   };
 
-  // Render helper voor artist-tags: lookup in de opgehaalde "allArtistTags"-lijst
   const renderArtistTags = () => {
     if (selectedArtistTags.length === 0) {
-      return <Text style={styles.previewTagText}>Artist Tags</Text>;
+      return <Text style={styles.selectText}>Select</Text>;
     }
     return selectedArtistTags.map((tagId: string) => {
       const cleanId = tagId.trim();
       const tagObj = allArtistTags.find((t) => t.id.trim() === cleanId);
       if (!tagObj) {
-        return <Text key={cleanId} style={styles.previewTagText}>{cleanId}</Text>;
+        return (
+          <Text key={cleanId} style={styles.selectedTagText}>
+            {cleanId}
+          </Text>
+        );
       }
       return (
         <ArtistTag
@@ -327,17 +332,20 @@ const UploadScreen: React.FC = () => {
     });
   };
 
-  // Render helper voor genre-tags: lookup in de opgehaalde "allGenreTags"-lijst en toon alleen de naam
   const renderGenreTags = () => {
     if (selectedGenreTags.length === 0) {
-      return <Text style={styles.previewTagText}>Genre Tags</Text>;
+      return <Text style={styles.selectText}>Select</Text>;
     }
     return selectedGenreTags.map((tagId: string) => {
       const cleanId = tagId.trim();
       const tagObj = allGenreTags.find((t) => t.id.trim() === cleanId);
       if (!tagObj) {
         const name = cleanId.replace(/^genre_/, "");
-        return <Text key={cleanId} style={styles.previewTagText}>{name}</Text>;
+        return (
+          <Text key={cleanId} style={styles.selectedTagText}>
+            {name}
+          </Text>
+        );
       }
       return <GenreTag key={tagObj.id} id={tagObj.id} name={tagObj.name} />;
     });
@@ -355,160 +363,148 @@ const UploadScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-       {/* Close-knop bovenaan */}
-       <TouchableOpacity
-        style={styles.closeBtn}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.closeTxt}>×</Text>
-      </TouchableOpacity>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.backButton}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>make a post</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.closeButton}>×</Text>
+        </TouchableOpacity>
+      </View>
+
       <KeyboardAwareScrollView
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={styles.scrollContainer}
         extraScrollHeight={20}
         enableOnAndroid={true}
         keyboardOpeningTime={0}
       >
-        {/* Toggle voor Video / Photo Upload */}
+        {/* Upload Type Toggle */}
         <View style={styles.toggleContainer}>
           <TouchableOpacity
             style={[
               styles.toggleButton,
-              uploadType === "video" && styles.activeToggleButton,
+              uploadType === "video" && styles.toggleButtonActive
             ]}
-            onPress={() => setUploadType("video")}
+            onPress={() => handleUploadTypeChange("video")}
           >
-            <Text
-              style={[
-                styles.toggleText,
-                uploadType === "video" && styles.activeToggleText,
-              ]}
-            >
-              Video Upload
+            <Text style={[
+              styles.toggleButtonText,
+              uploadType === "video" && styles.toggleButtonTextActive
+            ]}>
+              Video
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.toggleButton,
-              uploadType === "photo" && styles.activeToggleButton,
+              uploadType === "photo" && styles.toggleButtonActive
             ]}
-            onPress={() => setUploadType("photo")}
+            onPress={() => handleUploadTypeChange("photo")}
           >
-            <Text
-              style={[
-                styles.toggleText,
-                uploadType === "photo" && styles.activeToggleText,
-              ]}
-            >
-              Photo Upload
+            <Text style={[
+              styles.toggleButtonText,
+              uploadType === "photo" && styles.toggleButtonTextActive
+            ]}>
+              Photo + Audio
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Preview Card */}
-        <View style={styles.previewCard}>
-          {/* Header: Profile en Tags */}
-          <View style={styles.previewHeader}>
-            <View style={styles.profileContainer}>
-              <ProfileLink userId={currentUser.id}>
-                <Image
-                  source={{
-                    uri: currentUser.profileImage || "https://via.placeholder.com/30",
-                  }}
-                  style={styles.profilePic}
-                />
-              </ProfileLink>
-              <ProfileLink userId={currentUser.id}>
-                <View style={styles.userInfo}>
-                  <Text style={styles.usernameText}>
-                    {currentUser.username || "YourUsername"}
-                  </Text>
-                  <Text style={styles.displayNameText}>
-                    {currentUser.displayName || "Display Name"}{" "}
-                    <Text style={styles.dot}>•</Text> {currentUser.role || "Role"}
-                  </Text>
-                </View>
-              </ProfileLink>
+        {/* Media Preview */}
+        <TouchableOpacity style={styles.mediaContainer} onPress={pickMedia}>
+          {selectedMedia ? (
+            <Image source={{ uri: selectedMedia }} style={styles.mediaPreview} />
+          ) : (
+            <View style={styles.mediaPlaceholder}>
+              <Text style={styles.mediaPlaceholderText}>
+                Tap to select {uploadType === "video" ? "video" : "photo"}
+              </Text>
             </View>
-            {/* Tags-sectie */}
-            <View style={styles.previewTagsContainer}>
-              <TouchableOpacity onPress={goToArtistTagSelect}>
-                <View style={styles.artistTagsContainerHeader}>
-                  {renderArtistTags()}
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={goToGenreTagSelect}>
-                <View style={styles.genreTagsContainerHeader}>
-                  {renderGenreTags()}
-                </View>
-              </TouchableOpacity>
-            </View>
-          </View>
+          )}
+        </TouchableOpacity>
 
-          {/* Media Container met overlay voor Title en Description */}
-          <TouchableOpacity style={styles.previewMediaContainer} onPress={pickMedia}>
-            {selectedMedia ? (
-              <Image source={{ uri: selectedMedia }} style={styles.previewMedia} />
-            ) : (
-              <View style={styles.previewMediaPlaceholder}>
-                <Text style={styles.previewMediaPlaceholderText}>Select Media</Text>
-              </View>
-            )}
-            <View style={styles.mediaOverlay}>
-              {editingTitle ? (
-                <TextInput
-                  style={styles.titleInput}
-                  value={title}
-                  onChangeText={setTitle}
-                  onBlur={() => setEditingTitle(false)}
-                  placeholder="Post Title"
-                  placeholderTextColor="#aaa"
-                  autoFocus
-                />
-              ) : (
-                <TouchableOpacity onPress={() => setEditingTitle(true)}>
-                  <Text style={styles.previewPostTitle}>
-                    {title || "Post Title"}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {editingDescription ? (
-                <TextInput
-                  style={styles.descriptionInput}
-                  value={description}
-                  onChangeText={setDescription}
-                  onBlur={() => setEditingDescription(false)}
-                  placeholder="Post Description"
-                  placeholderTextColor="#aaa"
-                  multiline
-                  autoFocus
-                />
-              ) : (
-                <TouchableOpacity onPress={() => setEditingDescription(true)}>
-                  <Text style={styles.previewPostDescription}>
-                    {description || "Post Description..."}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </TouchableOpacity>
-
-          {/* Audio Upload knop (alleen bij photo-upload) */}
-          {uploadType === "photo" && (
-            <TouchableOpacity style={styles.audioUploadButton} onPress={pickAudio}>
-              <Text style={styles.audioUploadButtonText}>
-                {selectedAudio ? "Change Audio" : "Select Audio"}
+        {/* Audio Upload (alleen voor photo) */}
+        {uploadType === "photo" && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Upload your audio</Text>
+            <TouchableOpacity style={styles.audioButton} onPress={pickAudio}>
+              <Text style={styles.audioButtonText}>
+                {selectedAudio ? "Change Audio" : "Select Audio File"}
               </Text>
             </TouchableOpacity>
-          )}
+          </View>
+        )}
 
-          {/* Upload knop */}
-          <TouchableOpacity style={styles.uploadButton} onPress={handleUpload}>
-            <Text style={styles.uploadButtonText}>
-              {uploading ? "Uploading..." : "Upload"}
-            </Text>
-          </TouchableOpacity>
-          {error && <Text style={styles.errorText}>Error: {error}</Text>}
+        {/* Title */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Title</Text>
+          <TextInput
+            style={styles.input}
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Caption it in a few words: who and what are you looking for..."
+            placeholderTextColor="#666"
+          />
         </View>
+
+        {/* Description */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Description</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Tell users a little bit more about the post and about you..."
+            placeholderTextColor="#666"
+            multiline
+            numberOfLines={4}
+          />
+        </View>
+
+        {/* Artist Tags */}
+        <View style={styles.section}>
+          <View style={styles.tagRow}>
+            <Text style={styles.sectionLabel}>Artist tags:</Text>
+            <TouchableOpacity style={styles.tagSelector} onPress={goToArtistTagSelect}>
+              <View style={styles.tagContent}>{renderArtistTags()}</View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Genre Tags */}
+        <View style={styles.section}>
+          <View style={styles.tagRow}>
+            <Text style={styles.sectionLabel}>Genre tags:</Text>
+            <TouchableOpacity style={styles.tagSelector} onPress={goToGenreTagSelect}>
+              <View style={styles.tagContent}>{renderGenreTags()}</View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* I'm looking for */}
+        <View style={styles.section}>
+          <View style={styles.tagRow}>
+            <Text style={styles.sectionLabel}>I'm looking for a:</Text>
+            <TouchableOpacity style={styles.tagSelector}>
+              <Text style={styles.selectText}>Select</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Upload Button */}
+        <TouchableOpacity
+          style={[styles.uploadButton, uploading && styles.uploadButtonDisabled]}
+          onPress={handleUpload}
+          disabled={uploading}
+        >
+          <Text style={styles.uploadButtonText}>
+            {uploading ? "Uploading..." : "Post"}
+          </Text>
+        </TouchableOpacity>
+
+        {error && <Text style={styles.errorText}>Error: {error}</Text>}
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );
@@ -517,187 +513,160 @@ const UploadScreen: React.FC = () => {
 export default UploadScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "black" },
-  contentContainer: {
-    flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    transform: [{ translateY: -20 }],
-    
-    paddingBottom: 20,
-  },
-  closeBtn: {
-    position: 'absolute',
-    bottom: 720,
-    right: 16,
-    zIndex: 10,
-    padding: 8,
-  },
-  closeTxt: {
-    color: 'white',
-    fontSize: 28,
-    lineHeight: 28,
-  },
-  toggleContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
+  container: {
+    flex: 1,
     backgroundColor: "black",
-    padding: 6,
-    borderRadius: 10,
-    marginBottom: 10,
-    width: "75%",
   },
-  toggleButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-  },
-  activeToggleButton: {
-    backgroundColor: "#A020F0",
-  },
-  toggleText: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#B0B0B0",
-  },
-  activeToggleText: {
-    color: "#FFF",
-  },
-  previewCard: {
-    backgroundColor: "black",
-    borderRadius: 15,
-    padding: 10,
-    width: "90%",
-    height: Dimensions.get("window").height * 0.6,
-    alignSelf: "center",
-  },
-  previewHeader: {
+  header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 20,
   },
-  profileContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  profilePic: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#555",
-    marginRight: 10,
-  },
-  userInfo: {},
-  usernameText: {
+  backButton: {
     color: "white",
+    fontSize: 24,
+    fontWeight: "300",
+  },
+  headerTitle: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  closeButton: {
+    color: "white",
+    fontSize: 24,
+    fontWeight: "300",
+  },
+  scrollContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  toggleContainer: {
+    flexDirection: "row",
+    backgroundColor: "#2a2a2a",
+    borderRadius: 25,
+    padding: 4,
+    marginBottom: 20,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    alignItems: "center",
+  },
+  toggleButtonActive: {
+    backgroundColor: "#6B46C1",
+  },
+  toggleButtonText: {
+    color: "#666",
     fontSize: 14,
-    fontWeight: "bold",
+    fontWeight: "500",
   },
-  displayNameText: {
-    color: "#ccc",
-    fontSize: 12,
+  toggleButtonTextActive: {
+    color: "white",
   },
-  dot: {
-    marginHorizontal: 4,
-  },
-  previewTagsContainer: {
-    alignItems: "flex-end",
-  },
-  artistTagsContainerHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  genreTagsContainerHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginLeft: 5,
-  },
-  previewTagText: {
-    color: "#A0A0A0",
-    fontSize: 12,
-  },
-  previewMediaContainer: {
+  mediaContainer: {
     width: "100%",
-    height: 450,
-    borderRadius: 10,
+    height: 400,
+    borderRadius: 15,
     overflow: "hidden",
-    backgroundColor: "#000",
-    marginBottom: 10,
+    marginBottom: 30,
+    backgroundColor: "#1a1a1a",
   },
-  previewMedia: {
+  mediaPreview: {
     width: "100%",
     height: "100%",
   },
-  previewMediaPlaceholder: {
+  mediaPlaceholder: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#333",
+    backgroundColor: "#2a2a2a",
   },
-  previewMediaPlaceholderText: {
-    color: "#aaa",
+  mediaPlaceholderText: {
+    color: "#666",
+    fontSize: 16,
   },
-  mediaOverlay: {
-    position: "absolute",
-    bottom: 10,
-    left: 10,
-    right: 10,
+  section: {
+    marginBottom: 25,
   },
-  previewPostTitle: {
+  sectionLabel: {
     color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 5,
-    textShadowColor: "#000",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 1,
-  },
-  previewPostDescription: {
-    color: "white",
-    fontSize: 14,
-    textShadowColor: "#000",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 1,
-  },
-  titleInput: {
-    backgroundColor: "rgba(0,0,0,0.6)",
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
-    padding: 5,
-  },
-  descriptionInput: {
-    backgroundColor: "rgba(0,0,0,0.6)",
-    color: "white",
-    fontSize: 14,
-    padding: 5,
-    marginTop: 5,
-  },
-  audioUploadButton: {
-    backgroundColor: "#1E1E1E",
-    padding: 15,
-    borderRadius: 8,
-    alignItems: "center",
+    fontSize: 16,
+    fontWeight: "500",
     marginBottom: 10,
   },
-  audioUploadButtonText: {
-    color: "#A0A0A0",
+  input: {
+    backgroundColor: "#2a2a2a",
+    borderRadius: 25,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    color: "white",
+    fontSize: 14,
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: "top",
+  },
+  audioButton: {
+    backgroundColor: "#2a2a2a",
+    borderRadius: 25,
+    paddingVertical: 15,
+    alignItems: "center",
+  },
+  audioButtonText: {
+    color: "#666",
+    fontSize: 14,
+  },
+  tagRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  tagSelector: {
+    backgroundColor: "#2a2a2a",
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    minWidth: 80,
+  },
+  tagContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+  selectText: {
+    color: "#666",
+    fontSize: 14,
+  },
+  selectedTagText: {
+    color: "white",
+    fontSize: 12,
+    marginRight: 5,
   },
   uploadButton: {
-    backgroundColor: "#A020F0",
-    padding: 15,
-    borderRadius: 8,
+    backgroundColor: "#6B46C1",
+    borderRadius: 25,
+    paddingVertical: 18,
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 20,
+  },
+  uploadButtonDisabled: {
+    opacity: 0.6,
   },
   uploadButtonText: {
-    color: "#FFF",
-    fontWeight: "bold",
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
   errorText: {
     color: "red",
-    marginTop: 10,
+    marginTop: 15,
     textAlign: "center",
+    fontSize: 14,
   },
 });

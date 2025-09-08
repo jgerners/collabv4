@@ -32,9 +32,9 @@ const styles = StyleSheet.create({
         backgroundColor: "transparant",
         paddingHorizontal: 8,
         paddingVertical: 3,
-        borderRadius: 12,
+        borderRadius: 20,
         marginVertical: 4,
-        borderWidth: 1,               // Dunne rand
+        borderWidth: 3,               // Dunne rand
         borderColor: "white",         // Witte rand
        
       },

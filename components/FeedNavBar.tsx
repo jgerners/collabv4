@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: 80,
     flexDirection: 'row',
-    backgroundColor: '#131313',
+    backgroundColor: '#0C0C0C',
     borderTopWidth: 0,
     paddingHorizontal: 50,
     justifyContent: 'space-evenly',

@@ -27,7 +27,7 @@ const EXIT_EASING = Easing.bezier(0.55, 0.06, 0.68, 0.19)
 
 const MEDIA_HEIGHT = 140
 const MEDIA_WIDTH = 100
-const H_MARGIN = 25
+const H_MARGIN = 15
 
 const VideoOrImageBubble: React.FC<{
   item: ForYouPostData,
@@ -160,14 +160,15 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#fff",
-    fontSize: 16,
-    fontFamily: "Jost_800ExtraBold",
-    marginBottom: 0,
-  },
-  subtitle: {
-    color: "#bcbcbc",
     fontSize: 11,
     fontFamily: "Jost_500Medium",
+    marginBottom: 0,
+    
+  },
+  subtitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Jost_800ExtraBold",
     marginBottom: 7,
   },
   listContent: {
@@ -177,7 +178,7 @@ const styles = StyleSheet.create({
   },
   mediaBubble: {
     alignItems: "center",
-    marginRight: 6,
+    marginRight: 3,
     width: MEDIA_WIDTH,
   },
   media: {

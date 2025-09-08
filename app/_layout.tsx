@@ -35,6 +35,7 @@ import { StatusBar } from 'expo-status-bar';
 // 📌 Screens Importeren
 import FeedScreen from './(tabs)/feedtest';
 import ProfileScreen from './(tabs)/profile';
+import SettingsScreen from './(tabs)/settings';
 import search from './(tabs)/likes_test';
 import ChatListScreen from './(tabs)/chat_list';
 import ChatScreen from './screens/chat';
@@ -86,7 +87,7 @@ function TabsLayout() {
             height: 80,
             backgroundColor: 'rgb(6, 6, 6)',
             borderTopWidth: 0,
-            paddingHorizontal: 25,
+            paddingHorizontal: 50,
             justifyContent: 'space-evenly',
           },
           default: {
@@ -97,7 +98,7 @@ function TabsLayout() {
           },
         }),
         tabBarItemStyle: {
-          paddingTop: 8,
+          paddingTop: 14,
         },
 
         tabBarIcon: ({ focused, color }) => {
@@ -107,7 +108,7 @@ function TabsLayout() {
               return (
                 <MaterialCommunityIcons
                   name="home-variant"
-                  size={25}
+                  size={22}
                   color={color}
                   style={{ opacity }}
                 />
@@ -116,7 +117,7 @@ function TabsLayout() {
               return (
                 <MaterialCommunityIcons
                   name="chat"
-                  size={25}
+                  size={22}
                   color={color}
                   style={{ opacity }}
                 />
@@ -125,7 +126,7 @@ function TabsLayout() {
               return (
                 <Ionicons
                   name="search"
-                  size={25}
+                  size={22}
                   color={color}
                   style={{ opacity }}
                 />
@@ -134,7 +135,7 @@ function TabsLayout() {
               return (
                 <Ionicons
                   name="person"
-                  size={25}
+                  size={22}
                   color={color}
                   style={{ opacity }}
                 />
@@ -144,9 +145,9 @@ function TabsLayout() {
                 <View style={styles.uploadBubble}>
                   <Ionicons
                     name="add"
-                    size={24}
-                    color="black"
-                    style={{ opacity }}
+                    size={32}
+                    color="white"
+                    
                   />
                 </View>
               );
@@ -176,13 +177,10 @@ function TabsLayout() {
     >
       <Tab.Screen
         name="Feed"
-        // Geef de setter door aan FeedScreen!
         children={props => (
           <FeedScreen {...props} setFeedBarVisible={setFeedBarVisible} />
         )}
-        options={{
-          headerShown: false,
-        }}
+        options={{ headerShown: false }}
       />
       <Tab.Screen name="COLLABS!" component={ChatListScreen} />
       <Tab.Screen
@@ -203,6 +201,7 @@ function TabsLayout() {
         options={{ headerShown: false }}
         component={ProfileScreen}
       />
+      {/** Settings is not a tab; added to Stack below */}
     </Tab.Navigator>
   );
 }
@@ -264,6 +263,16 @@ function AuthNavigator() {
               }}
             />
           </Stack.Group>
+          <Stack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{
+              headerShown: true,
+              headerTitle: 'Settings',
+              headerTintColor: 'white',
+              headerStyle: { backgroundColor: 'black' },
+            }}
+          />
           <Stack.Screen
             name="Chat"
             component={ChatScreen}
@@ -365,9 +374,9 @@ const styles = StyleSheet.create({
   },
   uploadBubble: {
     width: 60,
-    height: 37,
-    borderRadius: 30,
-    backgroundColor: "#fff",  // Altijd witte bubble
+    height: 45,
+    borderRadius: 10,
+    backgroundColor: "#262626",  // Altijd witte bubble
     justifyContent: 'center',
     alignItems: 'center',
   },

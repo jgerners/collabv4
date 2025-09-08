@@ -328,7 +328,7 @@ const FeedScreenContent: React.FC<FeedScreenContentProps> = ({ setFeedBarVisible
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#131313" },
+  container: { flex: 1, backgroundColor: "#0C0C0C" },
   loadingContainer: { justifyContent: "center", alignItems: "center" },
   footer: { paddingVertical: 20, alignItems: "center" },
   tabWrapper: { flex: 1 },

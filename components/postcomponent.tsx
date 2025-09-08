@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useRef, useEffect } from "react"
-import { View, Text, Image, Pressable, StyleSheet, TouchableOpacity, ScrollView, Modal, Vibration, Animated, Easing } from "react-native"
+import { View, Text, Image, Pressable, StyleSheet, TouchableOpacity, Modal, Animated, Easing } from "react-native"
 import { Video, ResizeMode, Audio } from "expo-av"
 import Slider from "@react-native-community/slider"
 import { Play, Pause, Bookmark } from "lucide-react-native"
@@ -15,14 +15,20 @@ import { getCachedAudio, setCachedAudio } from "../helpers/audioCache"
 import { setCurrentPlayingMedia } from "../PlaybackManager"
 import Collab from "./mainbuttons/collab"
 import ArtistTag from "./mainbuttons/tags/artist_tags"
-import Title from "./mainbuttons/title"
+import Title from "./mainbuttons/title"    // <--- de nieuwe marquee bubble!
 import ReplayButton from "./mainbuttons/replay"
 import { BlurView } from "expo-blur"
+import { Ionicons } from "@expo/vector-icons"
+import * as Haptics from 'expo-haptics'
+import PlayingIndicator from "./PlayingIndicator"
+
+// 🟢  HIERONDER PROFILELINK IMPORTEER JE TOE  
+import ProfileLink from "./profileLink"
 
 const H_MARGIN = 16
-const MEDIA_SIZE = 155
-const INFO_WIDTH = 215
-const BUBBLE_HEIGHT = 155
+const MEDIA_SIZE = 160
+const INFO_WIDTH = 230
+const BUBBLE_HEIGHT = 160
 const BUBBLE_RADIUS = 12
 
 export interface ArtistTagData {
@@ -130,6 +136,8 @@ const PostComponent: React.FC<PostProps> = ({
 
   // Slide bubble state
   const [currentSlide, setCurrentSlide] = React.useState(0)
+  const [showArtistDropdown, setShowArtistDropdown] = React.useState(false)
+  const [showGenreDropdown, setShowGenreDropdown] = React.useState(false)
 
   useEffect(() => {
     if (isAfterActivePost) {
@@ -298,11 +306,12 @@ const PostComponent: React.FC<PostProps> = ({
 
   // Long press handlers voor tril + modal
   const longPressTimeout = useRef<number | null>(null)
+
   const handleMediaBubblePressIn = () => {
     longPressTimeout.current = setTimeout(() => {
-      Vibration.vibrate(30)
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
       setMediaModalOpen(true)
-    }, 600) as unknown as number
+    }, 200)
   }
   const handleMediaBubblePressOut = () => {
     if (longPressTimeout.current) {
@@ -319,7 +328,7 @@ const PostComponent: React.FC<PostProps> = ({
     setCurrentSlide((prev) => (prev === 0 ? 1 : 0))
   }
 
-  // Render media: bubble of modal (nooit tegelijk video!)
+  // --- Media BUBBLE (links) ---
   const renderMedia = (isModal = false) => {
     const style = isModal ? styles.modalMedia : styles.media
     if (post.mediaType === "video") {
@@ -344,6 +353,33 @@ const PostComponent: React.FC<PostProps> = ({
     }
   }
 
+  // --- Blurred media als infobubble background (altijd stilstaand, geen controls) ---
+  const renderBlurredMediaBg = () => {
+    if (!post.mediaUrl) return null
+    if (post.mediaType === "video") {
+      return (
+        <Video
+          source={{ uri: post.mediaUrl as string }}
+          style={styles.infoMediaBg}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay={false}
+          isLooping={false}
+          useNativeControls={false}
+          isMuted={true}
+          positionMillis={0}
+        />
+      )
+    } else {
+      return (
+        <Image
+          source={{ uri: post.mediaUrl as string }}
+          style={styles.infoMediaBg}
+        />
+      )
+    }
+  }
+
+  // --- Modal seekbar ---
   const renderModalSeekbar = () => (
     <View style={styles.seekbarModalRow} pointerEvents="box-none">
       <Text style={styles.seekbarTimeText}>{formatTime(animatedTime)}</Text>
@@ -362,11 +398,7 @@ const PostComponent: React.FC<PostProps> = ({
     </View>
   )
 
-  const modalPressHandler = (evt: any) => {
-    if (evt.target === evt.currentTarget) setMediaModalOpen(false)
-  }
-
-  // Breedte titel max 80% van de bubble
+  // --- Titel max breedte ---
   const TITLE_MAX_WIDTH = INFO_WIDTH * 0.8
 
   return (
@@ -386,7 +418,7 @@ const PostComponent: React.FC<PostProps> = ({
         }}
       >
         <View style={styles.rowPressable}>
-          {/* MEDIA BUBBLE */}
+          {/* MEDIA BUBBLE (links) */}
           {!isMediaModalOpen && (
             <Pressable
               style={[styles.mediaBubble, { width: MEDIA_SIZE, height: BUBBLE_HEIGHT }]}
@@ -401,7 +433,7 @@ const PostComponent: React.FC<PostProps> = ({
             </Pressable>
           )}
 
-          {/* INFO BUBBLE (2 slides) */}
+          {/* INFO BUBBLE (rechts) */}
           <Pressable
             style={[
               styles.infoBubble,
@@ -415,6 +447,20 @@ const PostComponent: React.FC<PostProps> = ({
             ]}
             onPress={handleInfoBubblePress}
           >
+            {/* BLURRED MEDIA BACKGROUND */}
+            <View style={StyleSheet.absoluteFill}>
+              {renderBlurredMediaBg()}
+              <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+              <View style={styles.infoBubbleOverlay} />
+            </View>
+            
+            {/* PLAYING INDICATOR - Rechtsboven (alleen op slide 1) */}
+            {isActive && currentSlide === 0 && (
+              <View style={styles.playingIndicatorContainer}>
+                <PlayingIndicator isPlaying={isActive} size={10} color="#ffffff" />
+              </View>
+            )}
+            {/* CONTENT OVERLAY */}
             <Animated.View
               style={{
                 flexDirection: "row",
@@ -429,85 +475,107 @@ const PostComponent: React.FC<PostProps> = ({
               }}
             >
               {/* SLIDE 1 */}
-              <View style={{ width: INFO_WIDTH, justifyContent: "flex-start" }}>
-                {/* Username + profielfoto STRAK naast elkaar */}
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 1 }}>
-                  <Text
-                    style={styles.profileUsername}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
-                    {post.username}
-                  </Text>
-                  <Image
-                    source={{ uri: post.profileImage }}
-                    style={styles.profileImage}
-                  />
-                </View>
-                {/* Role onder username */}
+              <View style={styles.infoBubbleContent}>
+                {/* Username + profielfoto naast elkaar */}
+                <ProfileLink userId={post.userId}>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 1 }}>
+                    <Text
+                      style={styles.profileUsername}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {post.username}
+                    </Text>
+                    <Image
+                      source={{ uri: post.profileImage }}
+                      style={styles.profileImage}
+                    />
+                  </View>
+                </ProfileLink>
                 <Text style={styles.profileRole} numberOfLines={1}>
                   {post.role}
                 </Text>
+                {/* Title max 80% breed: GEEN VIEW MEER! */}
+                <Title
+                  title={post.title}
+                  style={{ width: TITLE_MAX_WIDTH }}
+                  textStyle={styles.titleText}
+                />
+                {/* TAG BUBBLES (Apple-like glass buttons) */}
+                <View style={styles.tagBubblesRow}>
+                  {/* Artist bubble */}
+                  <Pressable
+                    style={styles.tagBubble}
+                    onPress={() => {
+                      setShowArtistDropdown((v) => !v)
+                      setShowGenreDropdown(false)
+                    }}
+                  >
+                    <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={styles.tagBubbleContent}>
+                      <View style={styles.tagBubbleAvatars}>
+                        {(post.artistTags || []).slice(0, 3).map((tagId, i) => {
+                          const tag = artistTags.find((t) => t.id === tagId)
+                          if (!tag) return null
+                          return (
+                            <Image key={tag.id} source={{ uri: tag.image }} style={[styles.smallAvatar, { marginLeft: i === 0 ? 0 : -8 }]} />
+                          )
+                        })}
+                      </View>
+                      <Text style={styles.tagTitle}>Artist <Text style={styles.tagSub}>tags</Text></Text>
+                    </View>
+                  </Pressable>
 
-                {/* Title max 80% breed */}
-                <View style={{ minHeight: 36, justifyContent: "flex-start" }}>
-                  <Title title= {post.title} 
-                  maxLines={2}
-                  textStyle={StyleSheet.flatten([styles.titleText, { maxWidth: TITLE_MAX_WIDTH }])}  />
+                  {/* Genre bubble */}
+                  <Pressable
+                    style={styles.tagBubble}
+                    onPress={() => {
+                      setShowGenreDropdown((v) => !v)
+                      setShowArtistDropdown(false)
+                    }}
+                  >
+                    <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={styles.tagBubbleContent}>
+                      <View style={styles.tagBubbleAvatars}>
+                        <View style={styles.musicIconCircle}><Ionicons name="musical-notes" size={12} color="#fff" /></View>
+                        <View style={[styles.musicIconCircle, { marginLeft: -8 }]}><Ionicons name="disc" size={12} color="#fff" /></View>
+                        <View style={[styles.musicIconCircle, { marginLeft: -8 }]}><Ionicons name="radio" size={12} color="#fff" /></View>
+                      </View>
+                      <Text style={styles.tagTitle}>Genre <Text style={styles.tagSub}>tags</Text></Text>
+                    </View>
+                  </Pressable>
                 </View>
-               {/* ARTIST tags overlappen, genre tags inline erachter */}
-<View style={styles.tagsCombinedRow}>
-  {/* Overlappende artist tags */}
-  <View style={styles.tagsOverlapContainer}>
-    {(post.artistTags || []).map((tagId, i) => {
-      const tag = artistTags.find((t) => t.id === tagId)
-      if (!tag) return null
-      return (
-        <View
-          key={tag.id}
-          style={[
-            styles.artistTagBubbleOverlap,
-            { left: i * 16, zIndex: ((post.artistTags && post.artistTags.length) ? post.artistTags.length : 0) - i }
-          ]}
-        >
-          <ArtistTag id={tag.id} name={tag.name} image={tag.image} />
-        </View>
-      )
-    })}
-  </View>
 
-  {/* Genre tags ernaast, netjes uitgelijnd */}
-  {(() => {
-    const artistTagCount = post.artistTags?.length ?? 0;
-    const genreTagMarginLeft = artistTagCount > 0 ? ((artistTagCount - 1) * 16 + 34) : 0;
-    return (
-      <View style={[styles.genreTagsInlineRow, { marginLeft: genreTagMarginLeft }]}>
-        {(post.genreTags || []).map((tagId) => {
-          const tag = genreTags.find((t) => t.id === tagId)
-          if (!tag) return null
-          return (
-            <View key={tag.id} style={styles.genreTagBubbleInline}>
-              <Text style={{ color: "#fff", fontSize: 9 }}>{tag.name}</Text>
-            </View>
-          )
-        })}
-      </View>
-    );
-  })()}
-</View>
-
+                {/* DROPDOWNS */}
+                {showArtistDropdown && (
+                  <View style={[styles.dropdown, { top: -10, transform: [{ translateY: -120 }] }]}> 
+                    <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={{ padding: 8 }}>
+                      {artistTags.map((t) => (
+                        <View key={t.id} style={styles.dropdownRow}>
+                          <Image source={{ uri: t.image }} style={styles.dropdownAvatar} />
+                          <Text style={styles.dropdownText}>{t.name}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+                {showGenreDropdown && (
+                  <View style={[styles.dropdown, { top: -10, transform: [{ translateY: -120 }] }]}> 
+                    <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={{ padding: 8 }}>
+                      {genreTags.map((t) => (
+                        <View key={t.id} style={styles.dropdownRow}>
+                          <View style={styles.dropdownIconCircle}><Ionicons name="musical-note" size={14} color="#fff" /></View>
+                          <Text style={styles.dropdownText}>{t.name}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
               </View>
-
               {/* SLIDE 2 - Beschrijving */}
-              <View
-                style={{
-                  width: INFO_WIDTH,
-                  justifyContent: "flex-start",
-                  paddingLeft: 0,
-                  paddingRight: 10,
-                  paddingTop: 8,
-                }}
-              >
+              <View style={styles.infoBubbleContentRight}>
                 <Text
                   style={{
                     ...styles.descriptionText,
@@ -523,8 +591,7 @@ const PostComponent: React.FC<PostProps> = ({
                 <View style={[styles.seekbarRow, { opacity: 0, marginTop: 4, width: "100%" }]} />
               </View>
             </Animated.View>
-
-            {/* INDICATORS */}
+            {/* SLIDER INDICATORS */}
             <View
               style={{
                 position: "absolute",
@@ -535,12 +602,12 @@ const PostComponent: React.FC<PostProps> = ({
                 justifyContent: "center",
                 alignItems: "center",
                 pointerEvents: "none",
-                gap: 10,
+                gap: 5,
               }}
             >
               <View
                 style={{
-                  width: 16,
+                  width: 5,
                   height: 5,
                   borderRadius: 3,
                   backgroundColor: currentSlide === 0 ? "#fff" : "#454555",
@@ -550,7 +617,7 @@ const PostComponent: React.FC<PostProps> = ({
               />
               <View
                 style={{
-                  width: 16,
+                  width: 5,
                   height: 5,
                   borderRadius: 3,
                   backgroundColor: currentSlide === 1 ? "#fff" : "#454555",
@@ -561,7 +628,6 @@ const PostComponent: React.FC<PostProps> = ({
             </View>
           </Pressable>
         </View>
-
         {/* UITKLAPPENDE KNOPPEN */}
         <Animated.View
           style={[
@@ -653,19 +719,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 10,
     position: "relative",
-    marginLeft: 10,
+    marginLeft: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.13,
+    shadowRadius: 14,
+    elevation: 7,
   },
+  mediaBubbleModal: {},
   media: {
     width: MEDIA_SIZE,
     height: BUBBLE_HEIGHT,
     borderRadius: BUBBLE_RADIUS,
     resizeMode: "cover",
     backgroundColor: "#222",
-    
   },
   modalMedia: {
-    width: 350,
-    height: 500,
+    width: 340,
+    height: 340,
     borderRadius: 18,
     alignSelf: "center",
     backgroundColor: "#222",
@@ -684,14 +755,154 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 8,
   },
+  // --- INFObubble met blurred media background
   infoBubble: {
     borderRadius: 15,
     padding: 10,
     minHeight: 70,
-    backgroundColor: "#181818",
-    overflow: "hidden",
+    backgroundColor: "rgba(18,17,22,0.5)",
+    overflow: "visible",
     opacity: 1,
-  
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.13,
+    shadowRadius: 14,
+    elevation: 7,
+    position: "relative",
+    justifyContent: "flex-start",
+  },
+  infoMediaBg: {
+    width: INFO_WIDTH,
+    height: BUBBLE_HEIGHT,
+    borderRadius: 15,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    opacity: 1,
+  },
+  infoBubbleOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(10,10,20,0.60)",
+    borderRadius: 15,
+  },
+  playingIndicatorContainer: {
+    position: "absolute",
+    top: 20,
+    right: 20,
+    zIndex: 10,
+  },
+  infoBubbleContent: {
+    width: INFO_WIDTH,
+    justifyContent: "flex-start",
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  infoBubbleContentRight: {
+    width: INFO_WIDTH,
+    justifyContent: "flex-start",
+    paddingLeft: 0,
+    paddingRight: 10,
+    paddingTop: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  // New tag bubbles
+  tagBubblesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+    paddingHorizontal: 1,
+  },
+  tagBubble: {
+    flex: 1,
+    minWidth: 0,
+    height: 22,
+    borderRadius: 9,
+    overflow: "hidden",
+    backgroundColor: "rgba(20,20,24,0.35)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  tagBubbleContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 5,
+    gap: 5,
+  },
+  tagBubbleAvatars: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  smallAvatar: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  tagTitle: {
+    color: "#fff",
+    fontFamily: "Jost_700Bold",
+    fontSize: 9,
+  },
+  tagSub: {
+    color: "#ffffff",
+    opacity: 0.7,
+    fontFamily: "Jost_300Light",
+    fontSize: 8,
+  },
+  musicIconCircle: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#2A2A2E",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dropdown: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.1)",
+    zIndex: 50,
+  },
+  dropdownRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+  },
+  dropdownAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+  },
+  dropdownText: {
+    color: "#fff",
+    fontSize: 12,
+    fontFamily: "Jost_400Regular",
+  },
+  dropdownIconCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
   },
   profileUsername: {
     color: "#fff",
@@ -702,13 +913,25 @@ const styles = StyleSheet.create({
     marginBottom: 0,
     marginLeft: 5,
     marginTop: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.13,
+    shadowRadius: 14,
+    elevation: 7,
   },
   profileImage: {
-    width: 20,
-    height: 20,
+    width: 15,
+    height: 15,
     borderRadius: 10,
     marginLeft: 5,
-    marginBottom: 1,
+    marginBottom: 0,
+    transform: [{ translateY: 1 }],
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.13,
+    shadowRadius: 14,
+    elevation: 7,
+    opacity: 0,
   },
   profileRole: {
     color: "#bcbcbc",
@@ -724,8 +947,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Jost_300Light",
     fontSize: 12,
-    marginBottom: 2,
-    lineHeight: 15,
     marginLeft: 5,
   },
   descriptionText: {
@@ -733,7 +954,6 @@ const styles = StyleSheet.create({
     fontFamily: "Jost_400Regular",
     fontSize: 9.5,
     marginBottom: 3,
-    opacity: 0,
   },
   // --- Tags row ---
   tagsCombinedRow: {
@@ -744,6 +964,11 @@ const styles = StyleSheet.create({
     height: 32,
     marginTop: 4,
     marginLeft: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.13,
+    shadowRadius: 14,
+    elevation: 7,
   },
   tagsOverlapContainer: {
     flexDirection: "row",
@@ -762,20 +987,19 @@ const styles = StyleSheet.create({
     minHeight: 25,
     marginLeft: 0,
     transform: [
-    { translateY: -5 },    // omhoog
-    { translateX: -15 },    // naar links (gebruik een positief getal voor naar rechts)
-  ],
-    
+      { translateY: -5 },
+      { translateX: -15 },
+    ],
   },
   genreTagBubbleInline: {
     backgroundColor: "transparent",
-    borderRadius: 8,
+    borderRadius: 7,
     paddingHorizontal: 8,
     paddingVertical: 2,
     marginRight: 4,
     marginBottom: 2,
-    borderWidth: 1,
-    borderColor: "#555",
+    borderWidth: 0.5,
+    borderColor: "white",
   },
   seekbarRow: {
     flexDirection: "row",
@@ -797,22 +1021,26 @@ const styles = StyleSheet.create({
   expandedRow: {
     position: "absolute",
     top: BUBBLE_HEIGHT + 10,
-    left: 10,
+    left: 5,
     right: H_MARGIN,
     flexDirection: "row",
     alignItems: "flex-start",
+    
   },
   saveButtonContainer: {
     width: MEDIA_SIZE,
-    marginRight: 8,
+    marginRight: 5,
+    transform: [{ translateX: -5 }],
   },
   collabButtonContainer: {
     width: INFO_WIDTH,
+   
+    
   },
   saveButton: {
     width: "100%",
     backgroundColor: "#16141A",
-    borderRadius: 15,
+    borderRadius: 10,
     paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
@@ -820,31 +1048,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 7,
     flexDirection: "row",
+    
+  
   },
   saveButtonText: {
     color: "#fff",
     fontFamily: "Jost_700Bold",
     fontSize: 12,
   },
-
   // MODAL styles
   modalOverlay: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  modalContent: {
-    width: "100%",
-    height: "100%",
     position: "absolute",
-    justifyContent: "center",
-    alignItems: "center",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 100,
   },
-  mediaContainer: {
-    borderRadius: 18,
-    overflow: "hidden",
-    marginBottom: 20,
-  },
+  modalContent: {},
+  mediaContainer: {},
   seekbarModalContainer: {
     width: 340,
     alignItems: "center",

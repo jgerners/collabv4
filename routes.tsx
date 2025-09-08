@@ -19,6 +19,7 @@ export type RootStackParamList = {
     GenreTagSelect: undefined;   // <-- Toegevoegd
     Login: undefined; 
     Register: undefined; 
+    Settings: undefined;
 
     uploadProfileMedia: undefined;
 

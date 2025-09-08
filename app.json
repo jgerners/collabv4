@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.collabv4"
     },
     "android": {
       "adaptiveIcon": {
@@ -37,6 +38,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "937915f7-208e-4bf4-bcb8-ee3b2474c29a"
+      }
+    },
+    "owner": "skipvdv"
   }
 }

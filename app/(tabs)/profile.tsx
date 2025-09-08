@@ -17,11 +17,13 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../../routes";
 import { supabase } from "../../supabaseClient";
 import DemoModule from "../../components/demoModule";
+import { Ionicons } from '@expo/vector-icons';
 
 const BANNER_HEIGHT = 340;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const TAB_COUNT = 3;
 const TABS = ['Demos', 'Releases', 'Contact'];
+const USERNAME_TOP = BANNER_HEIGHT / 2 - 100;
 
 export default function ProfileScreen() {
   const { profile } = useAuth();
@@ -77,13 +79,21 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.root}>
+      {/* Settings icon (only for own profile) */}
+      <TouchableOpacity
+        onPress={() => navigation.navigate('Settings')}
+        style={[styles.settingsBtn, { top: USERNAME_TOP }]}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Ionicons name="reorder-three-outline" size={28} color="#FFFFFF" />
+      </TouchableOpacity>
       <View style={styles.absoluteBannerWrapper} pointerEvents="box-none">
         <ProfileBanner
           uri={profile?.profile_banner}
           height={BANNER_HEIGHT}
           style={styles.absoluteBanner}
         >
-          <Text style={styles.overlayUsername}>
+          <Text style={[styles.overlayUsername, { top: USERNAME_TOP }]}>
             {profile?.username || "Gebruiker"}
           </Text>
           <View style={styles.avatarContainer}>
@@ -190,6 +200,16 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: 'black',
+  },
+  settingsBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 50,
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   absoluteBannerWrapper: {
     position: 'absolute',
